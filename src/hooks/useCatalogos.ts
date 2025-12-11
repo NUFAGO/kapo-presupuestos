@@ -6,6 +6,7 @@ import {
   GET_DISTRITOS_BY_PROVINCIA_QUERY,
   GET_LOCALIDADES_BY_DISTRITO_QUERY,
   LIST_INFRAESTRUCTURAS_QUERY,
+  LIST_UNIDADES_QUERY,
 } from '@/graphql/queries/catalogos.queries';
 
 export interface Departamento {
@@ -47,6 +48,13 @@ export interface Infraestructura {
   id_infraestructura: string;
   nombre_infraestructura: string;
   tipo_infraestructura: string;
+  descripcion: string;
+}
+
+export interface Unidad {
+  id: string;
+  unidad_id: string;
+  nombre: string;
   descripcion: string;
 }
 
@@ -136,6 +144,23 @@ export function useInfraestructuras() {
         {}
       );
       return response.listInfraestructuras;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+}
+
+/**
+ * Hook para obtener la lista de unidades
+ */
+export function useUnidades() {
+  return useQuery({
+    queryKey: ['unidades'],
+    queryFn: async () => {
+      const response = await executeQuery<{ listUnidades: Unidad[] }>(
+        LIST_UNIDADES_QUERY,
+        {}
+      );
+      return response.listUnidades;
     },
     staleTime: 5 * 60 * 1000, // 5 minutos
   });

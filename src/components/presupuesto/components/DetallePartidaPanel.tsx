@@ -5,6 +5,8 @@ import { Plus, Trash2, Save, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SearchInput, type SearchItem } from '@/components/ui/search-input';
+import { SelectSearch } from '@/components/ui/select-search';
+import { useUnidades } from '@/hooks/useCatalogos';
 import { Recurso } from '@/hooks/useRecursos';
 import {
   useApuByPartida,
@@ -196,6 +198,9 @@ export default function DetallePartidaPanel({
   const [metradoInput, setMetradoInput] = useState<string>('0');
   const [unidadMedidaInput, setUnidadMedidaInput] = useState<string>('');
   const [hasPartidaChanges, setHasPartidaChanges] = useState(false);
+
+  // Obtener unidades para el select
+  const { data: unidades = [], isLoading: unidadesLoading } = useUnidades();
 
   // Guardar valores originales para poder cancelar
   const [valoresOriginales, setValoresOriginales] = useState<{
@@ -980,9 +985,10 @@ export default function DetallePartidaPanel({
     setRecursosEditables(JSON.parse(JSON.stringify(valoresOriginales.recursos)));
     setHasChanges(false);
     
-    // Restaurar metrado si hay cambios pendientes
+    // Restaurar metrado y unidad_medida si hay cambios pendientes
     if (hasPartidaChanges && partida) {
       setMetradoInput(String(partida.metrado));
+      setUnidadMedidaInput(partida.unidad_medida);
       setHasPartidaChanges(false);
     }
     
@@ -1234,15 +1240,17 @@ export default function DetallePartidaPanel({
   };
 
   // Handler para actualizar unidad de medida de la partida
-  const handleActualizarUnidadMedida = async (nuevaUnidad: string) => {
+  const handleActualizarUnidadMedida = async (nuevaUnidad: string | null) => {
     if (!partida || !id_partida || esPartidaNoGuardada) return;
 
-    const unidadTrimmed = nuevaUnidad.trim() || 'und';
+    // nuevaUnidad ya viene como nombre (string) del SearchSelect
+    // Permitir valores vacíos cuando el usuario borra manualmente (no forzar 'und')
+    const unidadFinal = nuevaUnidad?.trim() || '';
 
     try {
       await updatePartida.mutateAsync({
         id_partida: id_partida,
-        unidad_medida: unidadTrimmed,
+        unidad_medida: unidadFinal,
       });
       setHasPartidaChanges(false);
       // Invalidar y refetch query de estructura para actualizar la tabla principal
@@ -1358,20 +1366,31 @@ export default function DetallePartidaPanel({
         onGuardandoCambios(true);
       }
 
-      // Guardar metrado si hay cambios pendientes
+      // Guardar metrado y unidad_medida si hay cambios pendientes
       if (hayCambiosPartida && partida && id_partida && !esPartidaNoGuardada) {
+        // Validar que la unidad no esté vacía
+        const nuevaUnidad = unidadMedidaInput?.trim() || '';
+        if (!nuevaUnidad) {
+          toast.error('La unidad de medida no puede estar vacía');
+          return;
+        }
+
         const nuevoMetrado = parseFloat(metradoInput);
-        if (!isNaN(nuevoMetrado) && nuevoMetrado >= 0 && nuevoMetrado !== partida.metrado) {
+        const metradoCambio = !isNaN(nuevoMetrado) && nuevoMetrado >= 0 && nuevoMetrado !== partida.metrado;
+        const unidadCambio = nuevaUnidad !== partida.unidad_medida;
+
+        if (metradoCambio || unidadCambio) {
           try {
-            // El frontend calculará parcial_partida automáticamente, no es necesario enviarlo
             await updatePartida.mutateAsync({
               id_partida: id_partida,
-              metrado: nuevoMetrado,
+              metrado: !isNaN(nuevoMetrado) && nuevoMetrado >= 0 ? nuevoMetrado : partida.metrado,
+              unidad_medida: nuevaUnidad,
             });
             setHasPartidaChanges(false);
           } catch (error) {
-            console.error('Error al actualizar metrado:', error);
-            // Continuar con el guardado de recursos aunque falle el metrado
+            console.error('Error al actualizar metrado/unidad:', error);
+            toast.error('Error al actualizar la partida');
+            return;
           }
         }
       }
@@ -2268,23 +2287,21 @@ export default function DetallePartidaPanel({
             <div className="flex items-center gap-1">
               <span className="text-[var(--text-secondary)]">Unidad:</span>
               {hasPartida && !esPartidaNoGuardada && modoReal === 'edicion' ? (
-                <Input
-                  type="text"
-                  value={unidadMedidaInput}
-                  onChange={(e) => {
-                    setUnidadMedidaInput(e.target.value);
+                <SelectSearch
+                  value={unidadMedidaInput || null}
+                  onChange={(value) => {
+                    // Solo actualizar el estado local, no guardar inmediatamente
+                    // El guardado se hará con "Guardar cambios"
+                    setUnidadMedidaInput(value || '');
                     setHasPartidaChanges(true);
                   }}
-                  onBlur={(e) => {
-                    const value = e.target.value.trim();
-                    if (value && value !== partida!.unidad_medida) {
-                      handleActualizarUnidadMedida(value);
-                    } else if (!value) {
-                      setUnidadMedidaInput(partida!.unidad_medida);
-                      setHasPartidaChanges(false);
-                    }
-                  }}
-                  className="text-xs h-6 w-16 text-center px-1"
+                  options={unidades.map(unidad => ({
+                    value: unidad.nombre, // Guardar el nombre, no el _id
+                    label: unidad.nombre,
+                  }))}
+                  placeholder="Seleccionar unidad..."
+                  className="text-xs h-6 w-20 text-center px-1"
+                  isLoading={unidadesLoading}
                 />
               ) : (
                 <Input

@@ -4,7 +4,9 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { SearchInput, type SearchItem } from '@/components/ui/search-input';
+import { SelectSearch } from '@/components/ui/select-search';
 import { useEspecialidades } from '@/hooks/useEspecialidades';
+import { useUnidades } from '@/hooks/useCatalogos';
 import { X } from 'lucide-react';
 
 interface CrearPartidasTitulosFormProps {
@@ -40,6 +42,7 @@ export default function CrearPartidasTitulosForm({
   const [localNombre, setLocalNombre] = useState(nombre);
   const [localIdEspecialidad, setLocalIdEspecialidad] = useState<string | null>(id_especialidadProp || null);
   const { data: especialidades, isLoading: isLoadingEspecialidades } = useEspecialidades();
+  const { data: unidades = [], isLoading: unidadesLoading } = useUnidades();
   const especialidadesCompletasRef = useRef<Map<string, { id_especialidad: string; nombre: string; descripcion: string }>>(new Map());
 
   // Actualizar el ref cuando cambian las especialidades
@@ -215,12 +218,19 @@ export default function CrearPartidasTitulosForm({
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">
                 Unidad de Medida
               </label>
-              <Input
-                type="text"
-                value={localPartidaData.unidad_medida}
-                onChange={(e) => handlePartidaFieldChange('unidad_medida', e.target.value)}
-                placeholder="und"
-                className="text-sm"
+              <SelectSearch
+                value={localPartidaData.unidad_medida || null}
+                onChange={(value) => {
+                  // Si se borra, mantener 'und' por defecto
+                  handlePartidaFieldChange('unidad_medida', value || 'und');
+                }}
+                options={unidades.map(unidad => ({
+                  value: unidad.nombre,
+                  label: unidad.nombre,
+                }))}
+                placeholder="Seleccionar unidad..."
+                className="text-sm text-left"
+                isLoading={unidadesLoading}
               />
             </div>
             <div>

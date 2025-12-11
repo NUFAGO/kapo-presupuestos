@@ -126,3 +126,14 @@ export const GET_INFRAESTRUCTURA_QUERY = `
   }
 `;
 
+export const LIST_UNIDADES_QUERY = `
+  query ListUnidades {
+    listUnidades {
+      id
+      unidad_id
+      nombre
+      descripcion
+    }
+  }
+`;
+
