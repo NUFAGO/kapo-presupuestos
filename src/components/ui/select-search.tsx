@@ -1,5 +1,5 @@
 'use client';
-
+//select adaptable
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, X } from 'lucide-react';
