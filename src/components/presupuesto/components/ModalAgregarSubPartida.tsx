@@ -525,7 +525,7 @@ export default function ModalAgregarSubPartida({
 
   const calcularSumaParcialesManoObra = useCallback((): number => {
     return recursosEditables
-      .filter((r) => r.tipo_recurso === 'MANO_OBRA' && r.unidad_medida?.toLowerCase() === 'hh')
+      .filter((r) => r.unidad_medida?.toLowerCase() === 'hh')
       .reduce((suma, r) => {
         if (!rendimiento || rendimiento <= 0) return suma;
         if (!jornada || jornada <= 0) return suma;
@@ -786,8 +786,9 @@ export default function ModalAgregarSubPartida({
   // Recalcular cuando cambian rendimiento o jornada
   useEffect(() => {
     if (recursosEditables.length > 0 && rendimiento > 0 && jornada > 0) {
+      // Calcular suma de HH de recursos con unidad "hh"
       const sumaHHManoObra = recursosEditables
-        .filter((r) => r.tipo_recurso === 'MANO_OBRA')
+        .filter((r) => r.unidad_medida?.toLowerCase() === 'hh')
         .reduce((suma, r) => {
           if (!rendimiento || rendimiento <= 0) return suma;
           if (!jornada || jornada <= 0) return suma;
@@ -800,7 +801,8 @@ export default function ModalAgregarSubPartida({
         prev.map((r) => {
           const nuevoRecurso = { ...r };
 
-          if (r.tipo_recurso === 'EQUIPO' && (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo')) {
+          // Si tiene unidad "%mo", actualizar precio automáticamente
+          if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
             nuevoRecurso.precio = roundToTwo(sumaHHManoObra);
           }
 
@@ -826,7 +828,42 @@ export default function ModalAgregarSubPartida({
   }, [rendimiento, jornada]);
 
   const handleEliminarRecurso = (recursoId: string) => {
-    setRecursosEditables((prev) => prev.filter((r) => r.id_recurso_apu !== recursoId));
+    const recursoAEliminar = recursosEditables.find(r => r.id_recurso_apu === recursoId);
+    const unidadMedidaEliminado = recursoAEliminar?.unidad_medida?.toLowerCase() || '';
+    
+    setRecursosEditables((prev) => {
+      const recursosActualizados = prev.filter((r) => r.id_recurso_apu !== recursoId);
+      
+      // Si el recurso eliminado tenía unidad "hh", recalcular recursos con "%mo"
+      if (unidadMedidaEliminado === 'hh') {
+        // Calcular nueva suma de HH después de eliminar
+        const sumaHHManoObra = recursosActualizados
+          .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
+          .reduce((suma, r) => {
+            if (!rendimiento || rendimiento <= 0) return suma;
+            if (!jornada || jornada <= 0) return suma;
+            const cuadrillaValue = r.cuadrilla || 1;
+            const parcialMO = (1 / rendimiento) * jornada * cuadrillaValue * (r.precio || 0);
+            return suma + parcialMO;
+          }, 0);
+        
+        // Actualizar precio y parcial de recursos con "%mo"
+        return recursosActualizados.map(r => {
+          if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
+            const precioActualizado = roundToTwo(sumaHHManoObra);
+            const parcialActualizado = roundToTwo(sumaHHManoObra * (r.cantidad / 100));
+            return {
+              ...r,
+              precio: precioActualizado,
+              parcial: parcialActualizado
+            };
+          }
+          return r;
+        });
+      }
+      
+      return recursosActualizados;
+    });
     setHasChanges(true);
   };
 

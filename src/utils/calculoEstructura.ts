@@ -107,7 +107,7 @@ function calcularSumaParcialesManoObra(
   preciosCompartidosMap: Map<string, number>
 ): number {
   return recursos
-    .filter(r => r.tipo_recurso === 'MANO_OBRA' && r.unidad_medida?.toLowerCase() === 'hh')
+    .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
     .reduce((suma, r) => {
       if (!rendimiento || rendimiento <= 0) return suma;
       if (!jornada || jornada <= 0) return suma;
@@ -158,7 +158,32 @@ export function calcularParcialRecurso(
 
   // Calcular precio usando lógica de prioridades
   const precio = calcularPrecioRecurso(recurso, preciosCompartidosMap, rendimiento, jornada);
+  const unidadMedidaLower = recurso.unidad_medida?.toLowerCase() || '';
 
+  // PRIMERO: Verificar unidades especiales (independientemente del tipo_recurso)
+  // Si tiene unidad "%mo", calcular basándose en la sumatoria de HH de recursos con unidad "hh"
+  if (unidadMedidaLower === '%mo') {
+    if (sumaHHManoObra === undefined) return 0;
+    return roundToTwo(sumaHHManoObra * (recurso.cantidad / 100));
+  }
+
+  // Si tiene unidad "hh" (horas hombre), usar cálculo con cuadrilla
+  if (unidadMedidaLower === 'hh') {
+    if (!rendimiento || rendimiento <= 0) return 0;
+    if (!jornada || jornada <= 0) return 0;
+    const cuadrillaValue = recurso.cuadrilla || 1;
+    return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+  }
+
+  // Si tiene unidad "hm" (horas máquina), usar cálculo con cuadrilla
+  if (unidadMedidaLower === 'hm') {
+    if (!rendimiento || rendimiento <= 0) return 0;
+    if (!jornada || jornada <= 0) return 0;
+    const cuadrillaValue = recurso.cuadrilla || 1;
+    return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+  }
+
+  // Para otros casos, usar lógica según tipo_recurso
   switch (recurso.tipo_recurso) {
     case 'MATERIAL': {
       const cantidadConDesperdicio = recurso.cantidad * 
@@ -173,24 +198,8 @@ export function calcularParcialRecurso(
       return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
     }
 
-    case 'EQUIPO': {
-      // Si la unidad es "%mo", calcular basándose en la sumatoria de HH de MO
-      if (recurso.unidad_medida === '%mo' || recurso.unidad_medida?.toLowerCase() === '%mo') {
-        if (sumaHHManoObra === undefined) return 0;
-        return roundToTwo(sumaHHManoObra * (recurso.cantidad / 100));
-      }
-
-      // Si la unidad es "hm" (horas hombre), usar cálculo con cuadrilla
-      if (recurso.unidad_medida === 'hm' || recurso.unidad_medida?.toLowerCase() === 'hm') {
-        if (!rendimiento || rendimiento <= 0) return 0;
-        if (!jornada || jornada <= 0) return 0;
-        const cuadrillaValue = recurso.cuadrilla || 1;
-        return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
-      }
-
-      // Para otras unidades: cálculo simple cantidad × precio
+    case 'EQUIPO':
       return roundToTwo(recurso.cantidad * precio);
-    }
 
     case 'SUBCONTRATO':
       return roundToTwo(recurso.cantidad * precio);

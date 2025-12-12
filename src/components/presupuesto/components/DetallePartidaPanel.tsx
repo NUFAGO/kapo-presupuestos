@@ -169,14 +169,6 @@ export default function DetallePartidaPanel({
   // Priorizar apuCalculado sobre apuDataBackend
   const apuData = apuCalculado || apuDataBackend;
   
-  // Log para debugging
-  useEffect(() => {
-    if (apuCalculado) {
-      console.log(`[DetallePartidaPanel] ✅ Usando APU calculado del frontend para partida ${id_partida}`);
-    } else if (apuDataBackend) {
-      console.log(`[DetallePartidaPanel] 🔄 Usando APU del backend para partida ${id_partida}`);
-    }
-  }, [apuCalculado, apuDataBackend, id_partida]);
 
   const createApu = useCreateApu();
   const updateApu = useUpdateApu();
@@ -191,6 +183,9 @@ export default function DetallePartidaPanel({
   const [jornada, setJornada] = useState<number>(8);
   const [rendimientoInput, setRendimientoInput] = useState<string>('1.0');
   const [jornadaInput, setJornadaInput] = useState<string>('8');
+  const [cantidadInputs, setCantidadInputs] = useState<Record<string, string>>({});
+  const [cuadrillaInputs, setCuadrillaInputs] = useState<Record<string, string>>({});
+  const [precioInputs, setPrecioInputs] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -268,14 +263,11 @@ export default function DetallePartidaPanel({
           if (esSubpartida && r.id_partida_subpartida) {
             // Si es un temp_id, buscar en datos locales (subpartidasPendientes o subPartidaParaActualizar)
             if (r.id_partida_subpartida.startsWith('temp_')) {
-              console.log(`[DetallePartidaPanel] 🔍 Subpartida con temp_id, buscando en datos locales: ${r.id_partida_subpartida}`);
-              
               // Buscar en subpartidasPendientes
               const subpartidaLocal = subpartidasPendientes?.find(sp => sp.id_partida === r.id_partida_subpartida) ||
                                       (subPartidaParaActualizar?.id_partida === r.id_partida_subpartida ? subPartidaParaActualizar : null);
               
               if (subpartidaLocal && subpartidaLocal.recursos && subpartidaLocal.recursos.length > 0) {
-                console.log(`[DetallePartidaPanel] ✅ Subpartida encontrada en datos locales: ${subpartidaLocal.recursos.length} recursos`);
                 
                 // Convertir recursos locales a RecursoAPUEditable
                 const recursosSubpartida: RecursoAPUEditable[] = subpartidaLocal.recursos.map((sr: any) => {
@@ -310,12 +302,10 @@ export default function DetallePartidaPanel({
                 // Continuar con el siguiente recurso
                 return recursoBase;
               } else {
-                console.warn(`[DetallePartidaPanel] ⚠️ Subpartida con temp_id no encontrada en datos locales: ${r.id_partida_subpartida}`);
                 // Si no se encuentra en datos locales, buscar en apusCalculados
                 if (apusCalculados && r.id_partida_subpartida) {
                   const apuSubpartidaCalculado = apusCalculados.find(apu => apu.id_partida === r.id_partida_subpartida);
                   if (apuSubpartidaCalculado) {
-                    console.log(`[DetallePartidaPanel] ✅ APU de subpartida con temp_id encontrado en apusCalculados: ${apuSubpartidaCalculado.recursos?.length || 0} recursos`);
                     // Usar el APU encontrado en apusCalculados
                     const recursosSubpartida: RecursoAPUEditable[] = (apuSubpartidaCalculado.recursos || []).map((sr: any) => {
                       const recursoSub: RecursoAPUEditable = {
@@ -362,7 +352,6 @@ export default function DetallePartidaPanel({
             if (apusCalculados && r.id_partida_subpartida) {
               const apuSubpartidaCalculado = apusCalculados.find(apu => apu.id_partida === r.id_partida_subpartida);
               if (apuSubpartidaCalculado) {
-                console.log(`[DetallePartidaPanel] ✅ APU de subpartida encontrado en datos calculados: ${apuSubpartidaCalculado.recursos?.length || 0} recursos`);
                 subpartidaApu = apuSubpartidaCalculado;
               }
             }
@@ -370,7 +359,6 @@ export default function DetallePartidaPanel({
             // Si no se encontró en apusCalculados, hacer query al backend
             if (!subpartidaApu) {
               try {
-                console.log(`[DetallePartidaPanel] 🔍 Cargando APU de subpartida desde backend: ${r.id_partida_subpartida}`);
                 const subpartidaApuResponse = await executeQuery<{ getApuByPartida: any }>(
                   GET_APU_BY_PARTIDA_QUERY,
                   { id_partida: r.id_partida_subpartida }
@@ -378,10 +366,9 @@ export default function DetallePartidaPanel({
 
                 if (subpartidaApuResponse?.getApuByPartida) {
                   subpartidaApu = subpartidaApuResponse.getApuByPartida;
-                  console.log(`[DetallePartidaPanel] ✅ APU de subpartida cargado desde backend: ${subpartidaApu.recursos?.length || 0} recursos`);
                 }
               } catch (error) {
-                console.error(`[DetallePartidaPanel] ❌ Error al cargar APU de subpartida ${r.id_partida_subpartida}:`, error);
+                // Error al cargar APU de subpartida
               }
             }
 
@@ -449,16 +436,121 @@ export default function DetallePartidaPanel({
                   // Si no se encuentra, usar el id_partida actual como referencia
                   recursoBase.id_partida_original = id_partida || undefined;
                 }
-            } else {
-              console.warn(`[DetallePartidaPanel] ⚠️ No se encontró APU para subpartida: ${r.id_partida_subpartida}`);
             }
           }
 
           return recursoBase;
         });
 
-        const recursosEditable = await Promise.all(recursosEditablePromises);
+        let recursosEditable = await Promise.all(recursosEditablePromises);
+        
+        // Calcular suma de HH ANTES de establecer en el estado (para recursos con %mo)
+        // Esto evita que se muestre el precio incorrecto (0.01) antes de que el useEffect lo actualice
+        const calcularSumaHHDesdeRecursos = (recursos: RecursoAPUEditable[]): number => {
+          return recursos
+            .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
+            .reduce((suma, r) => {
+              if (!nuevoRendimiento || nuevoRendimiento <= 0) return suma;
+              if (!nuevaJornada || nuevaJornada <= 0) return suma;
+              const cuadrillaValue = r.cuadrilla || 1;
+              const precio = r.precio || 0;
+              const parcialMO = (1 / nuevoRendimiento) * nuevaJornada * cuadrillaValue * precio;
+              return suma + parcialMO;
+            }, 0);
+        };
+
+        const sumaHHManoObra = calcularSumaHHDesdeRecursos(recursosEditable);
+
+        // Función auxiliar para calcular cantidad desde cuadrilla (usando nuevoRendimiento y nuevaJornada)
+        const calcularCantidadDesdeCuadrillaLocal = (cuadrilla: number): number => {
+          if (!nuevoRendimiento || nuevoRendimiento <= 0) return 0;
+          return truncateToFour((nuevaJornada * cuadrilla) / nuevoRendimiento);
+        };
+
+        // Función auxiliar para calcular parcial (usando nuevoRendimiento, nuevaJornada y sumaHHManoObra)
+        const calcularParcialLocal = (recurso: RecursoAPUEditable, sumaHH: number): number => {
+          // Si es una subpartida, el parcial es cantidad × precio_unitario_subpartida
+          if (recurso.esSubpartida && recurso.precio_unitario_subpartida !== undefined) {
+            return roundToTwo(recurso.cantidad * recurso.precio_unitario_subpartida);
+          }
+
+          const { tipo_recurso, cantidad, precio, cuadrilla, desperdicio_porcentaje, unidad_medida } = recurso;
+          const unidadMedidaLower = unidad_medida?.toLowerCase() || '';
+
+          // PRIMERO: Verificar si tiene unidad "%mo" (independientemente del tipo_recurso)
+          if (unidadMedidaLower === '%mo') {
+            return roundToTwo(sumaHH * (cantidad / 100));
+          }
+
+          // Si tiene unidad "hh" (horas hombre), usar cálculo con cuadrilla
+          if (unidadMedidaLower === 'hh') {
+            if (!nuevoRendimiento || nuevoRendimiento <= 0) return 0;
+            if (!nuevaJornada || nuevaJornada <= 0) return 0;
+            const cuadrillaValue = cuadrilla || 1;
+            return roundToTwo((1 / nuevoRendimiento) * nuevaJornada * cuadrillaValue * precio);
+          }
+
+          // Si tiene unidad "hm" (horas máquina), usar cálculo con cuadrilla
+          if (unidadMedidaLower === 'hm') {
+            if (!nuevoRendimiento || nuevoRendimiento <= 0) return 0;
+            if (!nuevaJornada || nuevaJornada <= 0) return 0;
+            const cuadrillaValue = cuadrilla || 1;
+            return roundToTwo((1 / nuevoRendimiento) * nuevaJornada * cuadrillaValue * precio);
+          }
+
+          // Para otros casos, usar lógica según tipo_recurso
+          switch (tipo_recurso) {
+            case 'MATERIAL':
+              const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
+              return roundToTwo(cantidadConDesperdicio * precio);
+
+            case 'MANO_OBRA': {
+              if (!nuevoRendimiento || nuevoRendimiento <= 0) return 0;
+              if (!nuevaJornada || nuevaJornada <= 0) return 0;
+              const cuadrillaValue = cuadrilla || 1;
+              return roundToTwo((1 / nuevoRendimiento) * nuevaJornada * cuadrillaValue * precio);
+            }
+
+            case 'EQUIPO':
+              return roundToTwo(cantidad * precio);
+
+            case 'SUBCONTRATO':
+              return roundToTwo(cantidad * precio);
+
+            default:
+              return roundToTwo(cantidad * precio);
+          }
+        };
+
+        // Actualizar precios y parciales de recursos con %mo ANTES de establecer en el estado
+        recursosEditable = recursosEditable.map(r => {
+          const nuevoRecurso = { ...r };
+
+          // Si tiene unidad "%mo", actualizar precio automáticamente (suma de parciales de recursos con "hh")
+          if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
+            nuevoRecurso.precio = roundToTwo(sumaHHManoObra);
+          }
+
+          // Si tiene cuadrilla (MO con "hh" o EQUIPO con "hm"), recalcular cantidad desde cuadrilla
+          const unidadMedidaLower = r.unidad_medida?.toLowerCase() || '';
+          const debeSincronizarCuadrilla = (r.tipo_recurso === 'MANO_OBRA' && unidadMedidaLower === 'hh') ||
+            (r.tipo_recurso === 'EQUIPO' && unidadMedidaLower === 'hm');
+
+          if (debeSincronizarCuadrilla && r.cuadrilla) {
+            nuevoRecurso.cantidad = calcularCantidadDesdeCuadrillaLocal(r.cuadrilla);
+          }
+
+          // Recalcular parcial con los valores actualizados (usando funciones locales con nuevoRendimiento y nuevaJornada)
+          nuevoRecurso.parcial = calcularParcialLocal(nuevoRecurso, sumaHHManoObra);
+
+          return nuevoRecurso;
+        });
+
         setRecursosEditables(recursosEditable);
+        // Limpiar estados locales de inputs
+        setCantidadInputs({});
+        setCuadrillaInputs({});
+        setPrecioInputs({});
 
         // Guardar valores originales
         setValoresOriginales({
@@ -476,6 +568,9 @@ export default function DetallePartidaPanel({
       setJornada(8);
       setRendimientoInput('1.0');
       setJornadaInput('8');
+      setCantidadInputs({});
+      setCuadrillaInputs({});
+      setPrecioInputs({});
       setValoresOriginales({
         rendimiento: 1.0,
         jornada: 8,
@@ -511,8 +606,8 @@ export default function DetallePartidaPanel({
     // Inicializar precios de recursos normales
     recursosEditables.forEach(r => {
       // Excluir recursos con precio calculado (%MO)
-      const esEquipoConPorcentajeMo = r.tipo_recurso === 'EQUIPO' && (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo');
-      if (r.recurso_id && r.precio !== undefined && r.precio !== null && !esEquipoConPorcentajeMo) {
+      const esConPorcentajeMo = r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo';
+      if (r.recurso_id && r.precio !== undefined && r.precio !== null && !esConPorcentajeMo) {
         // TODO: Aquí debería inicializar precio en el contexto si existe
         // precioSync.actualizarPrecio(r.recurso_id, r.precio, 'DetallePartidaPanel-carga');
       }
@@ -523,8 +618,8 @@ export default function DetallePartidaPanel({
       if (r.recursosSubpartida) {
         r.recursosSubpartida.forEach(sr => {
           // Excluir recursos con precio calculado (%MO)
-          const esEquipoConPorcentajeMoSub = sr.tipo_recurso === 'EQUIPO' && (sr.unidad_medida === '%mo' || sr.unidad_medida?.toLowerCase() === '%mo');
-          if (sr.recurso_id && sr.precio !== undefined && sr.precio !== null && !esEquipoConPorcentajeMoSub) {
+          const esConPorcentajeMoSub = sr.unidad_medida === '%mo' || sr.unidad_medida?.toLowerCase() === '%mo';
+          if (sr.recurso_id && sr.precio !== undefined && sr.precio !== null && !esConPorcentajeMoSub) {
             // TODO: Aquí debería inicializar precio en el contexto si existe
             // precioSync.actualizarPrecio(sr.recurso_id, sr.precio, 'DetallePartidaPanel-carga-subpartida');
           }
@@ -568,9 +663,9 @@ export default function DetallePartidaPanel({
   // Función helper para calcular la suma de parciales de MO con unidad "hh"
   const calcularSumaParcialesManoObra = useCallback((): number => {
     return recursosEditables
-      .filter(r => r.tipo_recurso === 'MANO_OBRA' && r.unidad_medida?.toLowerCase() === 'hh')
+      .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
       .reduce((suma, r) => {
-        // Calcular el parcial de cada recurso de MO con unidad "hh"
+        // Calcular el parcial de cada recurso con unidad "hh"
         if (!rendimiento || rendimiento <= 0) return suma;
         if (!jornada || jornada <= 0) return suma;
         const cuadrillaValue = r.cuadrilla || 1;
@@ -586,45 +681,45 @@ export default function DetallePartidaPanel({
     }
 
     const { tipo_recurso, cantidad, precio, cuadrilla, desperdicio_porcentaje, unidad_medida } = recurso;
+    const unidadMedidaLower = unidad_medida?.toLowerCase() || '';
 
+    // PRIMERO: Verificar unidades especiales (independientemente del tipo_recurso)
+    // Si tiene unidad "%mo", calcular basándose en la sumatoria de HH de recursos con unidad "hh"
+    if (unidadMedidaLower === '%mo') {
+      const sumaHHManoObra = calcularSumaParcialesManoObra();
+      return roundToTwo(sumaHHManoObra * (cantidad / 100));
+    }
+
+    // Si tiene unidad "hh" (horas hombre), usar cálculo con cuadrilla
+    if (unidadMedidaLower === 'hh') {
+      if (!rendimiento || rendimiento <= 0) return 0;
+      if (!jornada || jornada <= 0) return 0;
+      const cuadrillaValue = cuadrilla || 1;
+      return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+    }
+
+    // Si tiene unidad "hm" (horas máquina), usar cálculo con cuadrilla
+    if (unidadMedidaLower === 'hm') {
+      if (!rendimiento || rendimiento <= 0) return 0;
+      if (!jornada || jornada <= 0) return 0;
+      const cuadrillaValue = cuadrilla || 1;
+      return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+    }
+
+    // Para otros casos, usar lógica según tipo_recurso
     switch (tipo_recurso) {
       case 'MATERIAL':
         const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
         return roundToTwo(cantidadConDesperdicio * precio);
 
       case 'MANO_OBRA': {
-        // Fórmula correcta para MANO DE OBRA:
-        // Parcial_MO = (1 / Rendimiento) × Jornada × Cuadrilla × Precio_Hora
-        // O también: Parcial_MO = Cantidad × Precio_Hora (donde Cantidad = (Jornada × Cuadrilla) / Rendimiento)
         if (!rendimiento || rendimiento <= 0) return 0;
         if (!jornada || jornada <= 0) return 0;
-
         const cuadrillaValue = cuadrilla || 1;
-        // Parcial_MO = (1 / Rendimiento) × Jornada × Cuadrilla × Precio_Hora
         return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
       }
 
       case 'EQUIPO':
-        // Si la unidad es "%mo", calcular basándose en la sumatoria de HH de MO con unidad "hh"
-        if (unidad_medida === '%mo' || unidad_medida?.toLowerCase() === '%mo') {
-          // Sumar todos los parciales de MO con unidad "hh"
-          const sumaHHManoObra = calcularSumaParcialesManoObra();
-
-          // Aplicar el porcentaje: sumaHH * (cantidad / 100)
-          return roundToTwo(sumaHHManoObra * (cantidad / 100));
-        }
-
-        // Si la unidad es "hm" (horas hombre), usar cálculo con cuadrilla (similar a MANO_OBRA)
-        if (unidad_medida === 'hm' || unidad_medida?.toLowerCase() === 'hm') {
-          if (!rendimiento || rendimiento <= 0) return 0;
-          if (!jornada || jornada <= 0) return 0;
-
-          const cuadrillaValue = cuadrilla || 1;
-          // Parcial = (1 / Rendimiento) × Jornada × Cuadrilla × Precio_Hora
-          return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
-        }
-
-        // Para otras unidades: cálculo simple cantidad × precio
         return roundToTwo(cantidad * precio);
 
       case 'SUBCONTRATO':
@@ -728,9 +823,9 @@ export default function DetallePartidaPanel({
     }
 
     setRecursosEditables(prev => {
-      // Calcular suma de parciales de MANO_OBRA para equipos con unidad "%mo"
+      // Calcular suma de parciales de recursos con unidad "hh" para equipos con unidad "%mo"
       const sumaHHManoObra = prev
-        .filter(r => r.tipo_recurso === 'MANO_OBRA')
+        .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
         .reduce((suma, r) => {
           if (!rendimiento || rendimiento <= 0) return suma;
           if (!jornada || jornada <= 0) return suma;
@@ -742,8 +837,8 @@ export default function DetallePartidaPanel({
       return prev.map(r => {
         if (r.id_recurso_apu === recursoId) {
           const unidadMedida = recurso.unidad?.nombre || '';
-          // Si es EQUIPO con unidad "%mo", usar suma de parciales de MO con "hh" como precio
-          const precioFinal = (tipoRecurso === 'EQUIPO' && (unidadMedida === '%mo' || unidadMedida?.toLowerCase() === '%mo'))
+          // Si tiene unidad "%mo", usar suma de parciales de recursos con "hh" como precio
+          const precioFinal = (unidadMedida === '%mo' || unidadMedida?.toLowerCase() === '%mo')
             ? roundToTwo(sumaHHManoObra)
             : roundToTwo(precioInicial);
 
@@ -778,18 +873,8 @@ export default function DetallePartidaPanel({
 
   const handleUpdateRecurso = (recursoId: string, campo: keyof RecursoAPUEditable, valor: string | number | boolean | null | undefined) => {
     setRecursosEditables(prev => {
-      // Calcular suma de parciales de MANO_OBRA para actualizar precio de equipos con unidad "%mo"
-      const sumaHHManoObra = prev
-        .filter(r => r.tipo_recurso === 'MANO_OBRA')
-        .reduce((suma, r) => {
-          if (!rendimiento || rendimiento <= 0) return suma;
-          if (!jornada || jornada <= 0) return suma;
-          const cuadrillaValue = r.cuadrilla || 1;
-          const parcialMO = (1 / rendimiento) * jornada * cuadrillaValue * (r.precio || 0);
-          return suma + parcialMO;
-        }, 0);
-
-      return prev.map(r => {
+      // Primero aplicar el cambio al recurso
+      const recursosActualizados = prev.map(r => {
         if (r.id_recurso_apu === recursoId) {
           const numValor = typeof valor === 'string' ? parseFloat(valor) || 0 : (typeof valor === 'number' ? valor : 0);
           const nuevoRecurso = { ...r };
@@ -815,7 +900,7 @@ export default function DetallePartidaPanel({
           const unidadMedidaLower = r.unidad_medida?.toLowerCase() || '';
           const esManoObraConHh = r.tipo_recurso === 'MANO_OBRA' && unidadMedidaLower === 'hh';
           const esEquipoConHm = r.tipo_recurso === 'EQUIPO' && (unidadMedidaLower === 'hm');
-          const esEquipoConPorcentajeMo = r.tipo_recurso === 'EQUIPO' && (unidadMedidaLower === '%mo');
+          const esConPorcentajeMo = unidadMedidaLower === '%mo';
 
           if (esManoObraConHh || esEquipoConHm) {
             // Para MO con "hh" y EQUIPO con "hm": sincronizar cantidad ↔ cuadrilla
@@ -836,21 +921,19 @@ export default function DetallePartidaPanel({
             } else {
               (nuevoRecurso as any)[campo] = numValor;
             }
-          } else if (esEquipoConPorcentajeMo) {
-            // Para EQUIPO con unidad "%mo": solo actualizar cantidad (precio se calcula automáticamente)
+          } else if (esConPorcentajeMo) {
+            // Para recursos con unidad "%mo": solo actualizar cantidad (precio se calcula automáticamente)
             if (campo === 'cantidad') {
               nuevoRecurso.cantidad = truncateToFour(numValor);
             } else if (campo === 'precio') {
-              // No permitir editar precio manualmente para equipos con unidad "%mo"
-              // El precio se calcula automáticamente como suma de parciales de MANO_OBRA
+              // No permitir editar precio manualmente para recursos con unidad "%mo"
+              // El precio se calcula automáticamente como suma de parciales de recursos con unidad "hh"
               return r; // No hacer cambios si intentan editar el precio
             } else if (campo === 'desperdicio_porcentaje') {
               nuevoRecurso.desperdicio_porcentaje = truncateToFour(numValor);
             } else {
               (nuevoRecurso as any)[campo] = numValor;
             }
-            // Actualizar precio automáticamente (suma de parciales de MANO_OBRA) - redondear a 2 decimales
-            nuevoRecurso.precio = roundToTwo(sumaHHManoObra);
           } else if (r.tipo_recurso === 'EQUIPO') {
             // Para EQUIPO con otras unidades (excepto "%mo" y "hm"): solo cantidad y precio (sin cuadrilla)
             if (campo === 'cantidad') {
@@ -896,30 +979,13 @@ export default function DetallePartidaPanel({
           return nuevoRecurso;
         }
 
-        // Si es EQUIPO con unidad "%mo" (aunque no sea el recurso editado), actualizar precio automáticamente
-        if (r.tipo_recurso === 'EQUIPO' && (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo')) {
-          return {
-            ...r,
-            precio: roundToTwo(sumaHHManoObra)
-          };
-        }
-
         return r;
-      }).map(r => ({
-        ...r,
-        parcial: calcularParcial(r) // Recalcular todos los parciales (importante para equipos con unidad "%mo" que dependen de MANO_OBRA)
-      }));
-    });
-    setHasChanges(true);
-  };
+      });
 
-  // Recalcular parciales y sincronizar cantidad-cuadrilla cuando cambian rendimiento o jornada
-  // También actualizar precio automático para equipos con unidad "%mo"
-  useEffect(() => {
-    if (recursosEditables.length > 0 && rendimiento > 0 && jornada > 0) {
-      // Calcular suma de parciales de MANO_OBRA directamente (sin usar el callback para evitar bucle)
-      const sumaHHManoObra = recursosEditables
-        .filter(r => r.tipo_recurso === 'MANO_OBRA')
+      // DESPUÉS de aplicar los cambios, calcular suma de parciales de recursos con unidad "hh"
+      // para actualizar precio de equipos con unidad "%mo"
+      const sumaHHManoObra = recursosActualizados
+        .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
         .reduce((suma, r) => {
           if (!rendimiento || rendimiento <= 0) return suma;
           if (!jornada || jornada <= 0) return suma;
@@ -928,43 +994,179 @@ export default function DetallePartidaPanel({
           return suma + parcialMO;
         }, 0);
 
-      setRecursosEditables(prev => prev.map(r => {
-        const nuevoRecurso = { ...r };
+      // Actualizar precios de recursos con unidad "%mo" y recalcular parciales
+      // Para recursos con %mo, necesitamos calcular el parcial usando la suma de HH actualizada
+      return recursosActualizados.map(r => {
+        // Si tiene unidad "%mo", actualizar precio automáticamente y recalcular parcial
+        if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
+          const precioActualizado = roundToTwo(sumaHHManoObra);
+          // Calcular parcial directamente: sumaHH * (cantidad / 100)
+          const parcialActualizado = roundToTwo(sumaHHManoObra * (r.cantidad / 100));
+          return {
+            ...r,
+            precio: precioActualizado,
+            parcial: parcialActualizado
+          };
+        }
+        // Para otros recursos, recalcular parcial usando calcularParcial
+        // Pero para recursos con unidad "hh" que pueden afectar a %mo, necesitamos usar recursosActualizados
+        // Crear una función temporal que use recursosActualizados en lugar de recursosEditables
+        const calcularParcialConRecursosActualizados = (recurso: RecursoAPUEditable): number => {
+          // Si es una subpartida, el parcial es cantidad × precio_unitario_subpartida
+          if (recurso.esSubpartida && recurso.precio_unitario_subpartida !== undefined) {
+            return roundToTwo(recurso.cantidad * recurso.precio_unitario_subpartida);
+          }
 
-        // Si es EQUIPO con unidad "%mo", actualizar precio automáticamente (suma de parciales de MO con "hh")
-        if (r.tipo_recurso === 'EQUIPO' && (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo')) {
-          nuevoRecurso.precio = roundToTwo(sumaHHManoObra);
+          const { tipo_recurso, cantidad, precio, cuadrilla, desperdicio_porcentaje, unidad_medida } = recurso;
+
+          switch (tipo_recurso) {
+            case 'MATERIAL':
+              const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
+              return roundToTwo(cantidadConDesperdicio * precio);
+
+            case 'MANO_OBRA': {
+              if (!rendimiento || rendimiento <= 0) return 0;
+              if (!jornada || jornada <= 0) return 0;
+              const cuadrillaValue = cuadrilla || 1;
+              return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+            }
+
+            case 'EQUIPO':
+              // Si la unidad es "%mo", calcular basándose en la sumatoria de HH
+              if (unidad_medida === '%mo' || unidad_medida?.toLowerCase() === '%mo') {
+                // Usar la suma de HH ya calculada
+                return roundToTwo(sumaHHManoObra * (cantidad / 100));
+              }
+
+              // Si la unidad es "hm" (horas hombre), usar cálculo con cuadrilla
+              if (unidad_medida === 'hm' || unidad_medida?.toLowerCase() === 'hm') {
+                if (!rendimiento || rendimiento <= 0) return 0;
+                if (!jornada || jornada <= 0) return 0;
+                const cuadrillaValue = cuadrilla || 1;
+                return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+              }
+
+              // Para otras unidades: cálculo simple cantidad × precio
+              return roundToTwo(cantidad * precio);
+
+            case 'SUBCONTRATO':
+              return roundToTwo(cantidad * precio);
+
+            default:
+              return roundToTwo(cantidad * precio);
+          }
+        };
+
+        return {
+          ...r,
+          parcial: calcularParcialConRecursosActualizados(r)
+        };
+      });
+    });
+    setHasChanges(true);
+  };
+
+  // Recalcular parciales y sincronizar cantidad-cuadrilla cuando cambian rendimiento o jornada
+  // También actualizar precio automático para equipos con unidad "%mo"
+  useEffect(() => {
+    if (recursosEditables.length > 0 && rendimiento > 0 && jornada > 0) {
+      // Calcular suma de parciales de recursos con unidad "hh" directamente (sin usar el callback para evitar bucle)
+      const recursosHH = recursosEditables.filter(r => r.unidad_medida?.toLowerCase() === 'hh');
+      const sumaHHManoObra = recursosHH.reduce((suma, r) => {
+        if (!rendimiento || rendimiento <= 0) return suma;
+        if (!jornada || jornada <= 0) return suma;
+        const cuadrillaValue = r.cuadrilla || 1;
+        const precio = r.precio || 0;
+        const parcialMO = (1 / rendimiento) * jornada * cuadrillaValue * precio;
+        return suma + parcialMO;
+      }, 0);
+
+
+      setRecursosEditables(prev => {
+        // Verificar si hay recursos con %mo que necesitan actualización
+        const tieneRecursosPorcentajeMo = prev.some(r => r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo');
+        
+        if (!tieneRecursosPorcentajeMo && prev.every(r => {
+          const unidadMedidaLower = r.unidad_medida?.toLowerCase() || '';
+          const debeSincronizarCuadrilla = (r.tipo_recurso === 'MANO_OBRA' && unidadMedidaLower === 'hh') ||
+            (r.tipo_recurso === 'EQUIPO' && unidadMedidaLower === 'hm');
+          return !debeSincronizarCuadrilla || !r.cuadrilla;
+        })) {
+          // No hay cambios necesarios, evitar actualización
+          return prev;
         }
 
-        // Si tiene cuadrilla (MO con "hh" o EQUIPO con "hm"), recalcular cantidad desde cuadrilla
-        const unidadMedidaLower = r.unidad_medida?.toLowerCase() || '';
-        const debeSincronizarCuadrilla = (r.tipo_recurso === 'MANO_OBRA' && unidadMedidaLower === 'hh') ||
-          (r.tipo_recurso === 'EQUIPO' && unidadMedidaLower === 'hm');
+        return prev.map(r => {
+          const nuevoRecurso = { ...r };
 
-        if (debeSincronizarCuadrilla && r.cuadrilla) {
-          nuevoRecurso.cantidad = calcularCantidadDesdeCuadrilla(r.cuadrilla);
-        }
+          // Si tiene unidad "%mo", actualizar precio automáticamente (suma de parciales de recursos con "hh")
+          if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
+            nuevoRecurso.precio = roundToTwo(sumaHHManoObra);
+          }
 
-        // Recalcular parcial
-        nuevoRecurso.parcial = calcularParcial(nuevoRecurso);
+          // Si tiene cuadrilla (MO con "hh" o EQUIPO con "hm"), recalcular cantidad desde cuadrilla
+          const unidadMedidaLower = r.unidad_medida?.toLowerCase() || '';
+          const debeSincronizarCuadrilla = (r.tipo_recurso === 'MANO_OBRA' && unidadMedidaLower === 'hh') ||
+            (r.tipo_recurso === 'EQUIPO' && unidadMedidaLower === 'hm');
 
-        return nuevoRecurso;
-      }));
-      // Solo marcar como cambios si ya se cargaron los valores originales
-      if (valoresOriginales && recursosEditables.length > 0) {
+          if (debeSincronizarCuadrilla && r.cuadrilla) {
+            nuevoRecurso.cantidad = calcularCantidadDesdeCuadrilla(r.cuadrilla);
+          }
+
+          // Recalcular parcial
+          nuevoRecurso.parcial = calcularParcial(nuevoRecurso);
+
+          return nuevoRecurso;
+        });
+      });
+      // Solo marcar como cambios si ya se cargaron los valores originales Y estamos en modo edición
+      if (valoresOriginales && recursosEditables.length > 0 && modoReal === 'edicion') {
         setHasChanges(true);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rendimiento, jornada]);
+  }, [rendimiento, jornada, recursosEditables.length]); // Agregar recursosEditables.length para que se ejecute cuando se cargan los recursos
 
   const handleEliminarRecurso = (recursoId: string) => {
     // Verificar si el recurso que se va a eliminar es una subpartida
     const recursoAEliminar = recursosEditables.find(r => r.id_recurso_apu === recursoId);
+    const unidadMedidaEliminado = recursoAEliminar?.unidad_medida?.toLowerCase() || '';
 
     // Solo quitar el recurso localmente, no eliminar del backend
     // Se eliminará realmente cuando se pulse "Guardar Cambios"
-    setRecursosEditables(prev => prev.filter(r => r.id_recurso_apu !== recursoId));
+    setRecursosEditables(prev => {
+      const recursosActualizados = prev.filter(r => r.id_recurso_apu !== recursoId);
+      
+      // Si el recurso eliminado tenía unidad "hh", recalcular recursos con "%mo"
+      if (unidadMedidaEliminado === 'hh') {
+        // Calcular nueva suma de HH después de eliminar
+        const sumaHHManoObra = recursosActualizados
+          .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
+          .reduce((suma, r) => {
+            if (!rendimiento || rendimiento <= 0) return suma;
+            if (!jornada || jornada <= 0) return suma;
+            const cuadrillaValue = r.cuadrilla || 1;
+            const parcialMO = (1 / rendimiento) * jornada * cuadrillaValue * (r.precio || 0);
+            return suma + parcialMO;
+          }, 0);
+        
+        // Actualizar precio y parcial de recursos con "%mo"
+        return recursosActualizados.map(r => {
+          if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
+            const precioActualizado = roundToTwo(sumaHHManoObra);
+            const parcialActualizado = roundToTwo(sumaHHManoObra * (r.cantidad / 100));
+            return {
+              ...r,
+              precio: precioActualizado,
+              parcial: parcialActualizado
+            };
+          }
+          return r;
+        });
+      }
+      
+      return recursosActualizados;
+    });
 
     // Si es una subpartida, también eliminarla del estado del padre
     if (recursoAEliminar?.esSubpartida && recursoAEliminar.id_partida_subpartida && onEliminarSubPartida) {
@@ -983,6 +1185,10 @@ export default function DetallePartidaPanel({
     setRendimientoInput(String(valoresOriginales.rendimiento));
     setJornadaInput(String(valoresOriginales.jornada));
     setRecursosEditables(JSON.parse(JSON.stringify(valoresOriginales.recursos)));
+    // Limpiar estados locales de inputs
+    setCantidadInputs({});
+    setCuadrillaInputs({});
+    setPrecioInputs({});
     setHasChanges(false);
     
     // Restaurar metrado y unidad_medida si hay cambios pendientes
@@ -1136,9 +1342,9 @@ export default function DetallePartidaPanel({
 
                   case 'EQUIPO': {
                     if (unidad_medida === '%mo' || unidad_medida?.toLowerCase() === '%mo') {
-                      // Para %mo, necesitamos calcular la suma de parciales de MO de la subpartida
+                      // Para %mo, necesitamos calcular la suma de parciales de recursos con unidad "hh" de la subpartida
                       const sumaHHManoObra = (subPartidaParaActualizar.recursos || [])
-                        .filter(r => r.tipo_recurso === 'MANO_OBRA')
+                        .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
                         .reduce((suma, r) => {
                           if (rendimientoSubpartida > 0 && jornadaSubpartida > 0) {
                             const cuadrillaValue = r.cuadrilla || 1;
@@ -1444,22 +1650,9 @@ export default function DetallePartidaPanel({
         r => r.esSubpartida && r.id_partida_subpartida?.startsWith('temp_')
       );
 
-      console.log(`[DetallePartidaPanel] 💾 Guardando cambios APU - Subpartidas nuevas detectadas: ${subpartidasNuevas.length}`);
-      subpartidasNuevas.forEach((sp, idx) => {
-        console.log(`[DetallePartidaPanel] 📦 Subpartida ${idx + 1}:`, {
-          temp_id: sp.id_partida_subpartida,
-          descripcion: sp.descripcion,
-          recursosCount: sp.recursosSubpartida?.length || 0,
-          rendimiento: sp.rendimientoSubpartida,
-          jornada: sp.jornadaSubpartida,
-          precio_unitario: sp.precio_unitario_subpartida,
-        });
-      });
-
       const mapeoTempIdARealId = new Map<string, string>();
 
       if (subpartidasNuevas.length > 0 && id_partida && id_presupuesto && id_proyecto) {
-        console.log(`[DetallePartidaPanel] 🔧 Creando ${subpartidasNuevas.length} subpartidas nuevas...`);
         // Obtener partida completa para obtener id_titulo y nivel_partida
         let partidaCompleta: any = null;
         try {
@@ -1522,20 +1715,14 @@ export default function DetallePartidaPanel({
         }));
 
         // Crear partidas subpartidas y sus APUs
-        console.log(`[DetallePartidaPanel] 🚀 Enviando mutación para crear ${subpartidasParaCrear.length} subpartidas...`);
-        const tiempoCreacionInicio = performance.now();
         const resultado = await executeMutation<{ crearPartidasSubpartidasYAPUs: { mapeo: Array<{ temp_id: string; id_partida_real: string }> } }>(
           CREAR_PARTIDAS_SUBPARTIDAS_Y_APUS_MUTATION,
           { subpartidas: subpartidasParaCrear }
         );
-        const tiempoCreacionTotal = performance.now() - tiempoCreacionInicio;
-        console.log(`[DetallePartidaPanel] ⏱️ Creación de subpartidas completada: ${tiempoCreacionTotal.toFixed(2)}ms`);
 
         // Crear mapeo de temp_id -> id_partida_real
-        console.log(`[DetallePartidaPanel] 🔄 Mapeando temp_id -> id_partida_real:`);
         resultado.crearPartidasSubpartidasYAPUs.mapeo.forEach(m => {
           mapeoTempIdARealId.set(m.temp_id, m.id_partida_real);
-          console.log(`[DetallePartidaPanel]   ${m.temp_id} -> ${m.id_partida_real}`);
         });
 
         // Actualizar recursos editables con IDs reales
@@ -1543,7 +1730,6 @@ export default function DetallePartidaPanel({
           const nuevosRecursos = prev.map(recurso => {
             if (recurso.esSubpartida && recurso.id_partida_subpartida && mapeoTempIdARealId.has(recurso.id_partida_subpartida)) {
               const idReal = mapeoTempIdARealId.get(recurso.id_partida_subpartida)!;
-              console.log(`[DetallePartidaPanel] ✅ Actualizando recurso subpartida: ${recurso.id_partida_subpartida} -> ${idReal}`);
               return {
                 ...recurso,
                 id_partida_subpartida: idReal
@@ -1551,10 +1737,6 @@ export default function DetallePartidaPanel({
             }
             return recurso;
           });
-          const recursosActualizados = nuevosRecursos.filter(r => 
-            r.esSubpartida && r.id_partida_subpartida && !r.id_partida_subpartida.startsWith('temp_')
-          ).length;
-          console.log(`[DetallePartidaPanel] ✅ ${recursosActualizados} recursos actualizados con IDs reales`);
           return nuevosRecursos;
         });
 
@@ -1838,7 +2020,6 @@ export default function DetallePartidaPanel({
           let idPartidaSubpartidaMapeado = recursoEditable.id_partida_subpartida;
           if (recursoEditable.esSubpartida && idPartidaSubpartidaMapeado && mapeoTempIdARealId.has(idPartidaSubpartidaMapeado)) {
             idPartidaSubpartidaMapeado = mapeoTempIdARealId.get(idPartidaSubpartidaMapeado)!;
-            console.log(`[DetallePartidaPanel] 🔄 Mapeando id_partida_subpartida en recursoInput: ${recursoEditable.id_partida_subpartida} -> ${idPartidaSubpartidaMapeado}`);
           }
 
           const baseInput = {
@@ -2195,7 +2376,7 @@ export default function DetallePartidaPanel({
   };
 
   const totales = useMemo(() => {
-    return recursosEditables.reduce((acc, r) => ({
+    const calculado = recursosEditables.reduce((acc, r) => ({
       costo_materiales: acc.costo_materiales + (r.tipo_recurso === 'MATERIAL' && !r.esSubpartida ? r.parcial : 0),
       costo_mano_obra: acc.costo_mano_obra + (r.tipo_recurso === 'MANO_OBRA' ? r.parcial : 0),
       costo_equipos: acc.costo_equipos + (r.tipo_recurso === 'EQUIPO' ? r.parcial : 0),
@@ -2210,7 +2391,10 @@ export default function DetallePartidaPanel({
       costo_subpartidas: 0,
       costo_directo: 0,
     });
-  }, [recursosEditables]);
+
+
+    return calculado;
+  }, [recursosEditables, partida, modoReal]);
 
   const getTipoRecursoColor = (tipo: string, esSubpartida?: boolean) => {
     if (esSubpartida) {
@@ -2374,13 +2558,21 @@ export default function DetallePartidaPanel({
               {hasPartida && !esPartidaNoGuardada && modoReal === 'edicion' ? (
                 <Input
                   type="number"
-                  step="0.0001"
+                  step="any"
                   min="0"
                   value={rendimientoInput}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    let value = e.target.value;
+                    
+                    // Validar que no tenga más de 4 decimales
+                    const decimalMatch = value.match(/\.(\d*)/);
+                    if (decimalMatch && decimalMatch[1].length > 4) {
+                      const parts = value.split('.');
+                      value = parts[0] + '.' + parts[1].substring(0, 4);
+                    }
+                    
                     setRendimientoInput(value);
-                    if (value === '' || value === '-') {
+                    if (value === '' || value === '-' || value === '.') {
                       return;
                     }
                     const numValue = parseFloat(value);
@@ -2391,9 +2583,14 @@ export default function DetallePartidaPanel({
                       }
                     }
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'e' || e.key === 'E' || e.key === '+' || (e.key === '-' && (e.target as HTMLInputElement).selectionStart !== 0)) {
+                      e.preventDefault();
+                    }
+                  }}
                   onBlur={(e) => {
                     const value = e.target.value;
-                    if (value === '' || value === '-') {
+                    if (value === '' || value === '-' || value === '.') {
                       setRendimientoInput('1.0000');
                       setRendimiento(1.0);
                       return;
@@ -2424,13 +2621,21 @@ export default function DetallePartidaPanel({
               {hasPartida && !esPartidaNoGuardada && modoReal === 'edicion' ? (
                 <Input
                   type="number"
-                  step="0.0001"
+                  step="any"
                   min="0"
                   value={jornadaInput}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    let value = e.target.value;
+                    
+                    // Validar que no tenga más de 4 decimales
+                    const decimalMatch = value.match(/\.(\d*)/);
+                    if (decimalMatch && decimalMatch[1].length > 4) {
+                      const parts = value.split('.');
+                      value = parts[0] + '.' + parts[1].substring(0, 4);
+                    }
+                    
                     setJornadaInput(value);
-                    if (value === '' || value === '-') {
+                    if (value === '' || value === '-' || value === '.') {
                       return;
                     }
                     const numValue = parseFloat(value);
@@ -2441,9 +2646,14 @@ export default function DetallePartidaPanel({
                       }
                     }
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'e' || e.key === 'E' || e.key === '+' || (e.key === '-' && (e.target as HTMLInputElement).selectionStart !== 0)) {
+                      e.preventDefault();
+                    }
+                  }}
                   onBlur={(e) => {
                     const value = e.target.value;
-                    if (value === '' || value === '-') {
+                    if (value === '' || value === '-' || value === '.') {
                       setJornadaInput('8.0000');
                       setJornada(8);
                       return;
@@ -2622,13 +2832,6 @@ export default function DetallePartidaPanel({
                             onClick={recurso.esSubpartida ? () => {
                               // Abrir modal con la subpartida (para ver en modo lectura o editar en modo edición)
                               if (onEditarSubPartida && recurso.id_partida_subpartida) {
-                                console.log(`[DetallePartidaPanel] 🖱️ Clic en subpartida:`, {
-                                  id_partida_subpartida: recurso.id_partida_subpartida,
-                                  recursosCount: recurso.recursosSubpartida?.length || 0,
-                                  id_partida_original: recurso.id_partida_original,
-                                  rendimiento: recurso.rendimientoSubpartida,
-                                  jornada: recurso.jornadaSubpartida,
-                                });
                                 // Pasar TODOS los datos guardados: recursos, id_partida_original, rendimiento, jornada, descripcion
                                 onEditarSubPartida(
                                   recurso.id_partida_subpartida,
@@ -2638,12 +2841,6 @@ export default function DetallePartidaPanel({
                                   recurso.jornadaSubpartida,
                                   recurso.descripcion
                                 );
-                              } else {
-                                console.warn(`[DetallePartidaPanel] ⚠️ No se puede editar subpartida: falta id_partida_subpartida o callback`, {
-                                  tieneCallback: !!onEditarSubPartida,
-                                  tieneId: !!recurso.id_partida_subpartida,
-                                  id_partida_subpartida: recurso.id_partida_subpartida,
-                                });
                               }
                             } : undefined}
                             title={recurso.esSubpartida ? (modoReal === 'edicion' ? 'Clic para editar subpartida' : 'Clic para ver subpartida') : ''}
@@ -2683,30 +2880,77 @@ export default function DetallePartidaPanel({
                           return modoReal === 'edicion' ? (
                             <Input
                               type="number"
-                              step="0.0001"
+                              step="any"
                               min="0"
-                              value={recurso.cuadrilla === 0 ? '' : (recurso.cuadrilla ?? '')}
+                              value={cuadrillaInputs[recurso.id_recurso_apu] !== undefined 
+                                ? cuadrillaInputs[recurso.id_recurso_apu] 
+                                : (recurso.cuadrilla === 0 ? '' : (recurso.cuadrilla !== undefined && recurso.cuadrilla !== null ? String(truncateToFour(recurso.cuadrilla)) : ''))}
                               onFocus={(e) => {
-                                // Si el valor es 0, limpiar el campo
-                                if (recurso.cuadrilla === 0) {
-                                  e.target.value = '';
+                                if (cuadrillaInputs[recurso.id_recurso_apu] === undefined) {
+                                  setCuadrillaInputs(prev => ({
+                                    ...prev,
+                                    [recurso.id_recurso_apu]: recurso.cuadrilla === 0 ? '' : String(recurso.cuadrilla ?? '')
+                                  }));
                                 }
+                                e.target.select();
                               }}
                               onChange={(e) => {
-                                const value = e.target.value;
-                                if (value === '' || value === '-') {
-                                  handleUpdateRecurso(recurso.id_recurso_apu, 'cuadrilla', 0);
+                                let value = e.target.value;
+                                
+                                // Validar que no tenga más de 4 decimales
+                                const decimalMatch = value.match(/\.(\d*)/);
+                                if (decimalMatch && decimalMatch[1].length > 4) {
+                                  const parts = value.split('.');
+                                  value = parts[0] + '.' + parts[1].substring(0, 4);
+                                }
+                                
+                                setCuadrillaInputs(prev => ({
+                                  ...prev,
+                                  [recurso.id_recurso_apu]: value
+                                }));
+                                
+                                if (value === '' || value === '-' || value === '.') {
                                   return;
                                 }
+                                
                                 const numValue = parseFloat(value);
                                 if (!isNaN(numValue) && numValue >= 0) {
-                                  handleUpdateRecurso(recurso.id_recurso_apu, 'cuadrilla', numValue);
+                                  handleUpdateRecurso(recurso.id_recurso_apu, 'cuadrilla', truncateToFour(numValue));
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                const target = e.target as HTMLInputElement;
+                                if (e.key === 'e' || e.key === 'E' || e.key === '+' || (e.key === '-' && target.selectionStart !== 0)) {
+                                  e.preventDefault();
                                 }
                               }}
                               onBlur={(e) => {
-                                // Si el campo queda vacío al perder el focus, restaurar 0
-                                if (e.target.value === '' || e.target.value === '-') {
+                                const value = e.target.value;
+                                if (value === '' || value === '-' || value === '.') {
+                                  setCuadrillaInputs(prev => {
+                                    const newState = { ...prev };
+                                    delete newState[recurso.id_recurso_apu];
+                                    return newState;
+                                  });
                                   handleUpdateRecurso(recurso.id_recurso_apu, 'cuadrilla', 0);
+                                } else {
+                                  const numValue = parseFloat(value);
+                                  if (!isNaN(numValue) && numValue >= 0) {
+                                    const truncatedValue = truncateToFour(numValue);
+                                    handleUpdateRecurso(recurso.id_recurso_apu, 'cuadrilla', truncatedValue);
+                                    setCuadrillaInputs(prev => {
+                                      const newState = { ...prev };
+                                      delete newState[recurso.id_recurso_apu];
+                                      return newState;
+                                    });
+                                  } else {
+                                    setCuadrillaInputs(prev => {
+                                      const newState = { ...prev };
+                                      delete newState[recurso.id_recurso_apu];
+                                      return newState;
+                                    });
+                                    handleUpdateRecurso(recurso.id_recurso_apu, 'cuadrilla', recurso.cuadrilla || 0);
+                                  }
                                 }
                               }}
                               className="text-xs h-6 w-full text-center px-1"
@@ -2719,40 +2963,97 @@ export default function DetallePartidaPanel({
                       <td className="px-1 py-1 text-center">
                         {modoReal === 'edicion' ? (
                           (() => {
-                            const esEquipoPorcentajeMo = recurso.tipo_recurso === 'EQUIPO' && (recurso.unidad_medida === '%mo' || recurso.unidad_medida?.toLowerCase() === '%mo');
+                            const esPorcentajeMo = recurso.unidad_medida === '%mo' || recurso.unidad_medida?.toLowerCase() === '%mo';
                             return (
                               <div className="relative inline-flex items-center justify-center w-full">
                                 <Input
                                   type="number"
-                                  step="0.0001"
+                                  step="any"
                                   min="0"
-                                  value={recurso.cantidad === 0 ? '' : (recurso.cantidad ?? '')}
+                                  value={cantidadInputs[recurso.id_recurso_apu] !== undefined 
+                                    ? cantidadInputs[recurso.id_recurso_apu] 
+                                    : (recurso.cantidad === 0 ? '' : (recurso.cantidad !== undefined && recurso.cantidad !== null ? String(truncateToFour(recurso.cantidad)) : ''))}
                                   onFocus={(e) => {
-                                    // Si el valor es 0, limpiar el campo
-                                    if (recurso.cantidad === 0) {
-                                      e.target.value = '';
+                                    // Si no hay valor en el estado local, inicializarlo
+                                    if (cantidadInputs[recurso.id_recurso_apu] === undefined) {
+                                      setCantidadInputs(prev => ({
+                                        ...prev,
+                                        [recurso.id_recurso_apu]: recurso.cantidad === 0 ? '' : String(recurso.cantidad ?? '')
+                                      }));
                                     }
+                                    e.target.select();
                                   }}
                                   onChange={(e) => {
-                                    const value = e.target.value;
-                                    if (value === '' || value === '-') {
-                                      handleUpdateRecurso(recurso.id_recurso_apu, 'cantidad', 0);
+                                    let value = e.target.value;
+                                    
+                                    // Validar que no tenga más de 4 decimales
+                                    const decimalMatch = value.match(/\.(\d*)/);
+                                    if (decimalMatch && decimalMatch[1].length > 4) {
+                                      // Si tiene más de 4 decimales, truncar a 4
+                                      const parts = value.split('.');
+                                      value = parts[0] + '.' + parts[1].substring(0, 4);
+                                    }
+                                    
+                                    // Actualizar el estado local inmediatamente para permitir escribir valores como "0.05"
+                                    setCantidadInputs(prev => ({
+                                      ...prev,
+                                      [recurso.id_recurso_apu]: value
+                                    }));
+                                    
+                                    // Si el valor está vacío o es solo un punto, no actualizar el recurso aún
+                                    if (value === '' || value === '-' || value === '.') {
                                       return;
                                     }
+                                    
                                     const numValue = parseFloat(value);
+                                    // Solo actualizar el recurso si el valor es un número válido
                                     if (!isNaN(numValue) && numValue >= 0) {
-                                      handleUpdateRecurso(recurso.id_recurso_apu, 'cantidad', numValue);
+                                      handleUpdateRecurso(recurso.id_recurso_apu, 'cantidad', truncateToFour(numValue));
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    // Prevenir la notación científica (e, E) y el signo menos
+                                    const target = e.target as HTMLInputElement;
+                                    if (e.key === 'e' || e.key === 'E' || e.key === '+' || (e.key === '-' && target.selectionStart !== 0)) {
+                                      e.preventDefault();
                                     }
                                   }}
                                   onBlur={(e) => {
-                                    // Si el campo queda vacío al perder el focus, restaurar 0
-                                    if (e.target.value === '' || e.target.value === '-') {
+                                    const value = e.target.value;
+                                    // Si el campo queda vacío o tiene solo un punto, restaurar 0
+                                    if (value === '' || value === '-' || value === '.') {
+                                      setCantidadInputs(prev => {
+                                        const newState = { ...prev };
+                                        delete newState[recurso.id_recurso_apu];
+                                        return newState;
+                                      });
                                       handleUpdateRecurso(recurso.id_recurso_apu, 'cantidad', 0);
+                                    } else {
+                                      const numValue = parseFloat(value);
+                                      if (!isNaN(numValue) && numValue >= 0) {
+                                        // Actualizar el recurso con el valor final truncado a 4 decimales
+                                        const truncatedValue = truncateToFour(numValue);
+                                        handleUpdateRecurso(recurso.id_recurso_apu, 'cantidad', truncatedValue);
+                                        // Limpiar el estado local para que use el valor del recurso
+                                        setCantidadInputs(prev => {
+                                          const newState = { ...prev };
+                                          delete newState[recurso.id_recurso_apu];
+                                          return newState;
+                                        });
+                                      } else {
+                                        // Si no es válido, restaurar el valor anterior
+                                        setCantidadInputs(prev => {
+                                          const newState = { ...prev };
+                                          delete newState[recurso.id_recurso_apu];
+                                          return newState;
+                                        });
+                                        handleUpdateRecurso(recurso.id_recurso_apu, 'cantidad', recurso.cantidad || 0);
+                                      }
                                     }
                                   }}
-                                  className={`text-xs h-6 w-full text-center ${esEquipoPorcentajeMo ? 'pr-4' : 'px-1'}`}
+                                  className={`text-xs h-6 w-full text-center ${esPorcentajeMo ? 'pr-4' : 'px-1'}`}
                                 />
-                                {esEquipoPorcentajeMo && (
+                                {esPorcentajeMo && (
                                   <span className="absolute right-2 text-xs text-[var(--text-secondary)] pointer-events-none">%</span>
                                 )}
                               </div>
@@ -2769,10 +3070,10 @@ export default function DetallePartidaPanel({
                       </td>
                       <td className="px-1 py-1 text-center">
                         {(() => {
-                          const esEquipoPorcentajeMo = recurso.tipo_recurso === 'EQUIPO' && (recurso.unidad_medida === '%mo' || recurso.unidad_medida?.toLowerCase() === '%mo');
+                          const esPorcentajeMo = recurso.unidad_medida === '%mo' || recurso.unidad_medida?.toLowerCase() === '%mo';
 
                           // Para subpartidas o %mo, mostrar precio como texto de solo lectura
-                          if ((recurso.esSubpartida && recurso.precio_unitario_subpartida !== undefined) || esEquipoPorcentajeMo) {
+                          if ((recurso.esSubpartida && recurso.precio_unitario_subpartida !== undefined) || esPorcentajeMo) {
                             return (
                               <span className="text-xs text-[var(--text-primary)]">
                                 {recurso.esSubpartida
@@ -2787,70 +3088,87 @@ export default function DetallePartidaPanel({
                             <div className="flex items-center gap-1 justify-center">
                               <Input
                                 type="number"
-                                step="0.01"
+                                step="any"
                                 min="0"
-                                value={recurso.precio === 0 ? '' : (recurso.precio ?? '')}
+                                value={precioInputs[recurso.id_recurso_apu] !== undefined 
+                                  ? precioInputs[recurso.id_recurso_apu] 
+                                  : (recurso.precio === 0 ? '' : (recurso.precio !== undefined && recurso.precio !== null ? String(roundToTwo(recurso.precio)) : ''))}
                                 onFocus={(e) => {
-                                  // Si el valor es 0, limpiar el campo
-                                  if (recurso.precio === 0) {
-                                    e.target.value = '';
+                                  if (precioInputs[recurso.id_recurso_apu] === undefined) {
+                                    setPrecioInputs(prev => ({
+                                      ...prev,
+                                      [recurso.id_recurso_apu]: recurso.precio === 0 ? '' : String(recurso.precio ?? '')
+                                    }));
                                   }
+                                  e.target.select();
                                 }}
                                 onChange={(e) => {
-                                  const value = e.target.value;
-                                  if (value === '' || value === '-') {
-                                    handleUpdateRecurso(recurso.id_recurso_apu, 'precio', 0);
-                                    // Si tiene override activado, actualizar también precio_override
-                                    if (recurso.tiene_precio_override) {
-                                      handleUpdateRecurso(recurso.id_recurso_apu, 'precio_override', 0 as number);
-                                    }
+                                  let value = e.target.value;
+                                  
+                                  // Validar que no tenga más de 2 decimales
+                                  const decimalMatch = value.match(/\.(\d*)/);
+                                  if (decimalMatch && decimalMatch[1].length > 2) {
+                                    const parts = value.split('.');
+                                    value = parts[0] + '.' + parts[1].substring(0, 2);
+                                  }
+                                  
+                                  setPrecioInputs(prev => ({
+                                    ...prev,
+                                    [recurso.id_recurso_apu]: value
+                                  }));
+                                  
+                                  if (value === '' || value === '-' || value === '.') {
                                     return;
                                   }
+                                  
                                   const numValue = parseFloat(value);
                                   if (!isNaN(numValue) && numValue >= 0) {
-                                    // Asegurar que se muestre con exactamente 2 decimales
                                     const roundedValue = roundToTwo(numValue);
                                     handleUpdateRecurso(recurso.id_recurso_apu, 'precio', roundedValue);
-                                    // Si tiene override activado, actualizar también precio_override
                                     if (recurso.tiene_precio_override) {
                                       handleUpdateRecurso(recurso.id_recurso_apu, 'precio_override', roundedValue);
-                                    }
-                                  } else {
-                                    // Si no es válido, restaurar el valor anterior
-                                    handleUpdateRecurso(recurso.id_recurso_apu, 'precio', recurso.precio || 0);
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  // Si el campo queda vacío al perder el focus, restaurar 0
-                                  if (e.target.value === '' || e.target.value === '-') {
-                                    handleUpdateRecurso(recurso.id_recurso_apu, 'precio', 0);
-                                    // Si tiene override activado, actualizar también precio_override
-                                    if (recurso.tiene_precio_override) {
-                                      handleUpdateRecurso(recurso.id_recurso_apu, 'precio_override', 0 as number);
                                     }
                                   }
                                 }}
                                 onKeyDown={(e) => {
-                                  const key = e.key;
-                                  const currentValue = e.currentTarget.value;
-                                  const parts = currentValue.split('.');
-                                  const hasDecimal = parts.length > 1;
-                                  const decimalsCount = hasDecimal ? parts[1].length : 0;
-
-                                  // Prevenir entrada de caracteres no numéricos excepto punto y teclas de control
-                                  const isNumber = /^\d$/.test(key);
-                                  const isDecimal = key === '.' && !hasDecimal;
-                                  const isControl = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(key);
-                                  const isPaste = (e.ctrlKey || e.metaKey) && key === 'v';
-
-                                  // Si ya hay 2 decimales y se intenta escribir un número, bloquear
-                                  if (hasDecimal && decimalsCount >= 2 && isNumber && !isControl) {
+                                  const target = e.target as HTMLInputElement;
+                                  if (e.key === 'e' || e.key === 'E' || e.key === '+' || (e.key === '-' && target.selectionStart !== 0)) {
                                     e.preventDefault();
-                                    return;
                                   }
-
-                                  if (!isNumber && !isDecimal && !isControl && !isPaste) {
-                                    e.preventDefault();
+                                }}
+                                onBlur={(e) => {
+                                  const value = e.target.value;
+                                  if (value === '' || value === '-' || value === '.') {
+                                    setPrecioInputs(prev => {
+                                      const newState = { ...prev };
+                                      delete newState[recurso.id_recurso_apu];
+                                      return newState;
+                                    });
+                                    handleUpdateRecurso(recurso.id_recurso_apu, 'precio', 0);
+                                    if (recurso.tiene_precio_override) {
+                                      handleUpdateRecurso(recurso.id_recurso_apu, 'precio_override', 0 as number);
+                                    }
+                                  } else {
+                                    const numValue = parseFloat(value);
+                                    if (!isNaN(numValue) && numValue >= 0) {
+                                      const roundedValue = roundToTwo(numValue);
+                                      handleUpdateRecurso(recurso.id_recurso_apu, 'precio', roundedValue);
+                                      if (recurso.tiene_precio_override) {
+                                        handleUpdateRecurso(recurso.id_recurso_apu, 'precio_override', roundedValue);
+                                      }
+                                      setPrecioInputs(prev => {
+                                        const newState = { ...prev };
+                                        delete newState[recurso.id_recurso_apu];
+                                        return newState;
+                                      });
+                                    } else {
+                                      setPrecioInputs(prev => {
+                                        const newState = { ...prev };
+                                        delete newState[recurso.id_recurso_apu];
+                                        return newState;
+                                      });
+                                      handleUpdateRecurso(recurso.id_recurso_apu, 'precio', recurso.precio || 0);
+                                    }
                                   }
                                 }}
                                 onPaste={(e) => {
@@ -2900,7 +3218,7 @@ export default function DetallePartidaPanel({
                                   : `S/ ${recurso.precio !== undefined && recurso.precio !== null ? recurso.precio.toFixed(2) : '—'}`
                                 }
                               </span>
-                              {!recurso.esSubpartida && !esEquipoPorcentajeMo && recurso.tiene_precio_override && (
+                              {!recurso.esSubpartida && !esPorcentajeMo && recurso.tiene_precio_override && (
                                 <span className="text-xs text-[var(--text-secondary)] italic" title="Precio único">
                                   (Único)
                                 </span>
