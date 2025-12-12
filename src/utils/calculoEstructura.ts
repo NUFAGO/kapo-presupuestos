@@ -377,7 +377,7 @@ export function propagarTotalesTitulos(
   const totalesCalculados = new Map<string, number>();
   
   // Función recursiva para calcular total de un título y propagar hacia arriba
-  const calcularYPropagar = (id_titulo: string, visitados: Set<string> = new Set()): number => {
+  const calcularYPropagar = (id_titulo: string, visitados: Set<string> = new Set(), esPropagacion: boolean = false): number => {
     // Protección contra ciclos
     if (visitados.has(id_titulo)) {
       console.warn(`Ciclo detectado en jerarquía de títulos: ${id_titulo}`);
@@ -386,20 +386,25 @@ export function propagarTotalesTitulos(
     
     visitados.add(id_titulo);
     
-    // Si ya fue calculado, retornar
-    if (totalesCalculados.has(id_titulo)) {
+    // Si ya fue calculado Y es una propagación (un hijo se acaba de calcular),
+    // debemos RECALCULAR el padre para incluir todos los hijos actualizados
+    if (totalesCalculados.has(id_titulo) && esPropagacion) {
+      // Eliminar del mapa para forzar recálculo
+      totalesCalculados.delete(id_titulo);
+    } else if (totalesCalculados.has(id_titulo) && !esPropagacion) {
+      // Si ya fue calculado y NO es propagación, retornar
       visitados.delete(id_titulo);
       return totalesCalculados.get(id_titulo)!;
     }
     
-    // Calcular total del título
+    // Calcular total del título (siempre recalcula si es propagación)
     const total = calcularTotalTitulo(id_titulo, partidasPorTitulo, titulosHijos, totalesCalculados);
     totalesCalculados.set(id_titulo, total);
     
-    // Si tiene padre, propagar hacia arriba
+    // Si tiene padre, propagar hacia arriba (marcando que es propagación)
     const padre = tituloPadre.get(id_titulo);
     if (padre) {
-      calcularYPropagar(padre, visitados);
+      calcularYPropagar(padre, visitados, true); // ✅ esPropagacion = true para forzar recálculo
     }
     
     visitados.delete(id_titulo);
