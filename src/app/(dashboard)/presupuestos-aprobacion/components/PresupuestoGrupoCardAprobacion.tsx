@@ -27,7 +27,7 @@ interface PresupuestoGrupoCardAprobacionProps {
     total_presupuesto: number;
     descripcion_version?: string;
   }>;
-  tipoAprobacion: 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META';
+  tipoAprobacion: 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META' | 'OFICIALIZAR_META';
 }
 
 export default function PresupuestoGrupoCardAprobacion({
@@ -130,11 +130,15 @@ export default function PresupuestoGrupoCardAprobacion({
         from: 'Contractual',
         to: 'Meta',
       };
-    } else {
-      // NUEVA_VERSION_META
+    } else if (tipoAprobacion === 'NUEVA_VERSION_META') {
       return {
         from: 'Meta Borrador',
         to: 'Aprobado',
+      };
+    } else {
+      return {
+        from: 'Meta Aprobado',
+        to: 'Vigente',
       };
     }
   };
@@ -144,6 +148,8 @@ export default function PresupuestoGrupoCardAprobacion({
       return 'bg-orange-500/10 text-orange-600 dark:text-orange-400';
     } else if (tipoAprobacion === 'CONTRACTUAL_A_META') {
       return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
+    } else if (tipoAprobacion === 'OFICIALIZAR_META') {
+      return 'bg-purple-500/10 text-purple-600 dark:text-purple-400';
     } else {
       return 'bg-green-500/10 text-green-600 dark:text-green-400';
     }
@@ -182,6 +188,8 @@ export default function PresupuestoGrupoCardAprobacion({
                         ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
                         : tipoAprobacion === 'CONTRACTUAL_A_META'
                         ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                        : tipoAprobacion === 'OFICIALIZAR_META'
+                        ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
                         : 'bg-green-500/10 text-green-600 dark:text-green-400'
                     }`}>
                       V{version.version || 1}

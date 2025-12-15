@@ -195,7 +195,7 @@ export default function PresupuestoGrupoCardMeta({
 
 
   return (
-    <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg overflow-hidden card-shadow relative">
+    <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg overflow-hidden card-shadow relative border-l-2 border-green-500/20 dark:border-green-400/20 hover:border-green-500/35 dark:hover:border-green-400/35 transition-all">
       {/* Header del Grupo - Siempre visible */}
       <div
         className="p-4 cursor-default hover:bg-[var(--card-bg)]/50 transition-colors"
@@ -319,7 +319,7 @@ export default function PresupuestoGrupoCardMeta({
               versionesAMostrar.map((version) => (
               <div
                 key={version.id_presupuesto}
-                className="px-2 py-1.5 rounded bg-[var(--background)] card-shadow transition-all"
+                className="px-2 py-1.5 rounded bg-[var(--background)] card-shadow transition-all border-l-2 border-green-500/15 dark:border-green-400/15 hover:border-green-500/30 dark:hover:border-green-400/30 hover:bg-[var(--card-bg)]/30"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0 flex items-center gap-3">
