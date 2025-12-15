@@ -54,6 +54,11 @@ export default function PresupuestoGrupoCardContractual({
   }, [versiones]);
 
   const handleVerEstructura = (id_presupuesto: string) => {
+    // Guardar los query params actuales antes de navegar
+    const currentParams = new URLSearchParams(window.location.search);
+    if (currentParams.toString()) {
+      sessionStorage.setItem('contractuales_return_params', currentParams.toString());
+    }
     // Ruta específica para contractuales
     router.push(`/presupuestos-contractuales/estructura?presupuesto=${id_presupuesto}`);
   };

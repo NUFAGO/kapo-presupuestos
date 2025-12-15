@@ -42,13 +42,22 @@ function EstructuraContent() {
   // En presupuestos contractuales, todos están en modo lectura
   const modo = 'lectura';
 
+  // Construir ruta de retorno con los query params guardados
+  const rutaRetorno = (() => {
+    const savedParams = sessionStorage.getItem('contractuales_return_params');
+    if (savedParams) {
+      return `/presupuestos-contractuales?${savedParams}`;
+    }
+    return '/presupuestos-contractuales';
+  })();
+
   return (
     <EstructuraPresupuestoEditor
       id_presupuesto={id_presupuesto}
       id_proyecto={presupuesto.id_proyecto}
       nombre_presupuesto={presupuesto.nombre_presupuesto}
       modo={modo}
-      rutaRetorno="/presupuestos-contractuales"
+      rutaRetorno={rutaRetorno}
     />
   );
 }

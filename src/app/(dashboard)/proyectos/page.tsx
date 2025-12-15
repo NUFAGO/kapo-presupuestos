@@ -1,29 +1,36 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Search, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Modal from '@/components/ui/modal';
+import { LoadingSpinner } from '@/components/ui';
 import ProyectoCard from './components/ProyectoCard';
 import Pagination from './components/Pagination';
 import ProyectoForm from './components/ProyectoForm';
 import { useProyectos, useCreateProyecto, useUpdateProyecto, useDeleteProyecto } from '@/hooks';
+import { usePageState } from '@/hooks/usePageState';
 import { PaginationFilterInput } from '@/services/proyecto-service';
 import type { Proyecto } from '@/services/proyecto-service';
 
 const ITEMS_PER_PAGE = 20;
 
-export default function ProyectosPage() {
+function ProyectosContent() {
   const router = useRouter();
-  const [currentPage, setCurrentPage] = useState(1);
+  const {
+    searchQuery,
+    estadoFilter,
+    currentPage,
+    setSearchQuery,
+    setEstadoFilter,
+    setCurrentPage,
+    clearFilters,
+  } = usePageState('proyectos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProyecto, setSelectedProyecto] = useState<Proyecto | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [estadoFilter, setEstadoFilter] = useState<string>('');
-  const [showFilters, setShowFilters] = useState(false);
 
   // Preparar input para la query
   const queryInput: PaginationFilterInput = useMemo(() => {
@@ -78,6 +85,11 @@ export default function ProyectosPage() {
   };
 
   const handleProyectoClick = (proyecto: Proyecto) => {
+    // Guardar los query params actuales antes de navegar
+    const currentParams = new URLSearchParams(window.location.search);
+    if (currentParams.toString()) {
+      sessionStorage.setItem('proyectos_return_params', currentParams.toString());
+    }
     // Navegar a la página de detalles del proyecto
     router.push(`/proyectos/${proyecto.id_proyecto}`);
   };
@@ -139,18 +151,12 @@ export default function ProyectosPage() {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1); // Resetear a la primera página al buscar
+    // setCurrentPage ya se resetea automáticamente en el hook
   };
 
   const handleEstadoFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setEstadoFilter(e.target.value);
-    setCurrentPage(1); // Resetear a la primera página al filtrar
-  };
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setEstadoFilter('');
-    setCurrentPage(1);
+    // setCurrentPage ya se resetea automáticamente en el hook
   };
 
   return (
@@ -373,3 +379,16 @@ export default function ProyectosPage() {
   );
 }
 
+export default function ProyectosPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-3">
+        <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-12 text-center">
+          <LoadingSpinner size={80} showText={true} text="Cargando..." />
+        </div>
+      </div>
+    }>
+      <ProyectosContent />
+    </Suspense>
+  );
+}

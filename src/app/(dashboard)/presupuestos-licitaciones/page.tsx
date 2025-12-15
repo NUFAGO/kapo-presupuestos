@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X, Building2, FileText, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LoadingSpinner } from '@/components/ui';
 import { usePresupuestosPorFase } from '@/hooks/usePresupuestos';
 import { useProyectos } from '@/hooks';
+import { usePageState } from '@/hooks/usePageState';
 import PresupuestoGrupoCard from './components/PresupuestoGrupoCard';
 import ProyectoGrupoCard from './components/ProyectoGrupoCard';
 import type { Presupuesto } from '@/hooks/usePresupuestos';
@@ -23,11 +25,17 @@ interface ProyectoConPresupuestos {
   gruposPresupuestos: GrupoPresupuesto[];
 }
 
-export default function PresupuestosLicitacionesPage() {
+function PresupuestosLicitacionesContent() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filtroProyecto, setFiltroProyecto] = useState<string>('');
-  const [filtroPresupuesto, setFiltroPresupuesto] = useState<string>('');
+  const {
+    searchQuery,
+    filtroProyecto,
+    filtroPresupuesto,
+    setSearchQuery,
+    setFiltroProyecto,
+    setFiltroPresupuesto,
+    clearFilters,
+  } = usePageState('licitaciones');
 
   // Obtener todos los proyectos para el filtro
   const { data: proyectosData } = useProyectos({
@@ -158,12 +166,6 @@ export default function PresupuestosLicitacionesPage() {
     );
     return { totalProyectos, totalGrupos, totalVersiones };
   }, [proyectosFiltrados]);
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setFiltroProyecto('');
-    setFiltroPresupuesto('');
-  };
 
   const hasActiveFilters = searchQuery || filtroProyecto || filtroPresupuesto;
 
@@ -310,5 +312,19 @@ export default function PresupuestosLicitacionesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PresupuestosLicitacionesPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-3">
+        <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-12 text-center">
+          <LoadingSpinner size={80} showText={true} text="Cargando..." />
+        </div>
+      </div>
+    }>
+      <PresupuestosLicitacionesContent />
+    </Suspense>
   );
 }

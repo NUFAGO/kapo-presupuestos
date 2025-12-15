@@ -59,6 +59,11 @@ export default function PresupuestoGrupoCard({
   }, [versiones]);
 
   const handleVerEstructura = (id_presupuesto: string) => {
+    // Guardar los query params actuales antes de navegar
+    const currentParams = new URLSearchParams(window.location.search);
+    if (currentParams.toString()) {
+      sessionStorage.setItem('licitaciones_return_params', currentParams.toString());
+    }
     // Si está en revisión, pasar modo lectura
     const modo = estaEnRevision ? 'lectura' : 'edicion';
     router.push(`/presupuestos-licitaciones/estructura?presupuesto=${id_presupuesto}&modo=${modo}`);

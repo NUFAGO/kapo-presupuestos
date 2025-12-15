@@ -71,13 +71,22 @@ function EstructuraContent() {
     return 'edicion';
   }, [searchParams, presupuesto?.estado, presupuesto?.estado_aprobacion]);
 
+  // Construir ruta de retorno con los query params guardados
+  const rutaRetorno = (() => {
+    const savedParams = sessionStorage.getItem('meta_return_params');
+    if (savedParams) {
+      return `/presupuestos-meta?${savedParams}`;
+    }
+    return '/presupuestos-meta';
+  })();
+
   return (
     <EstructuraPresupuestoEditor
       id_presupuesto={id_presupuesto}
       id_proyecto={presupuesto.id_proyecto}
       nombre_presupuesto={presupuesto.nombre_presupuesto}
       modo={modo}
-      rutaRetorno="/presupuestos-meta"
+      rutaRetorno={rutaRetorno}
     />
   );
 }

@@ -2438,6 +2438,11 @@ export default function EstructuraPresupuestoEditor({
               variant="ghost"
               size="sm"
               onClick={() => {
+                // Limpiar los params guardados al regresar
+                sessionStorage.removeItem('licitaciones_return_params');
+                sessionStorage.removeItem('contractuales_return_params');
+                sessionStorage.removeItem('meta_return_params');
+                
                 if (rutaRetorno) {
                   router.push(rutaRetorno);
                 } else if (id_proyecto) {

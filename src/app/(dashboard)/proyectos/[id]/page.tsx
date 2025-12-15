@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,17 @@ export default function ProyectoDetallePage({ params }: PageProps) {
   const id_proyecto = id;
   const [isPresupuestoModalOpen, setIsPresupuestoModalOpen] = useState(false);
   const createPresupuestoPadre = useCreatePresupuestoPadre();
+
+  // Función para volver a proyectos preservando los query params
+  const handleVolverAProyectos = () => {
+    const savedParams = sessionStorage.getItem('proyectos_return_params');
+    const returnUrl = savedParams 
+      ? `/proyectos?${savedParams}`
+      : '/proyectos';
+    // Limpiar después de usar
+    sessionStorage.removeItem('proyectos_return_params');
+    router.push(returnUrl);
+  };
 
   // Consultar proyecto
   const { data: proyecto, isLoading: isLoadingProyecto, error: errorProyecto } = useProyecto(id_proyecto);
@@ -85,7 +96,7 @@ export default function ProyectoDetallePage({ params }: PageProps) {
             {errorProyecto ? 'Error al cargar el proyecto' : 'Proyecto no encontrado'}
           </p>
           <button
-            onClick={() => router.push('/proyectos')}
+            onClick={handleVolverAProyectos}
             className="mt-4 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow transition-all duration-200"
           >
             Volver a Proyectos
@@ -100,7 +111,7 @@ export default function ProyectoDetallePage({ params }: PageProps) {
       {/* Header con botón de volver */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => router.push('/proyectos')}
+          onClick={handleVolverAProyectos}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow transition-all duration-200"
         >
           <ArrowLeft className="h-4 w-4" />

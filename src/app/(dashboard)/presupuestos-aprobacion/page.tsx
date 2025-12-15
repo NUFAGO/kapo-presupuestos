@@ -10,7 +10,7 @@ export default function PresupuestosAprobacionPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filtroProyecto, setFiltroProyecto] = useState<string>('');
   const [filtroPresupuesto, setFiltroPresupuesto] = useState<string>('');
-  const [filtroTipoAprobacion, setFiltroTipoAprobacion] = useState<'' | 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META' | 'OFICIALIZAR_META'>('');
+  const [filtroTipoAprobacion, setFiltroTipoAprobacion] = useState<'' | 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META'>('');
 
   // Obtener datos reales del backend
   const { data: proyectosConPresupuestos = [], isLoading, error } = useAprobacionesPendientesAgrupadas();
@@ -87,12 +87,7 @@ export default function PresupuestosAprobacionPage() {
         acc + p.gruposPresupuestos.filter((g) => g.tipoAprobacion === 'CONTRACTUAL_A_META').length,
       0
     );
-    const pendientesOficializarMeta = proyectosFiltrados.reduce(
-      (acc, p) =>
-        acc + p.gruposPresupuestos.filter((g) => g.tipoAprobacion === 'OFICIALIZAR_META').length,
-      0
-    );
-    return { totalProyectos, totalGrupos, totalVersiones, pendientesLicitacion, pendientesContractual, pendientesOficializarMeta };
+    return { totalProyectos, totalGrupos, totalVersiones, pendientesLicitacion, pendientesContractual };
   }, [proyectosFiltrados]);
 
   const clearFilters = () => {
@@ -113,7 +108,7 @@ export default function PresupuestosAprobacionPage() {
             Aprobación de Presupuestos
           </h1>
           <p className="text-xs text-[var(--text-secondary)]">
-            Gestión de aprobaciones para pasar de Licitación a Contractual, Contractual a Meta, nuevas versiones Meta y oficialización Meta
+            Gestión de aprobaciones para pasar de Licitación a Contractual, Contractual a Meta y nuevas versiones Meta
           </p>
         </div>
       </div>
@@ -144,14 +139,13 @@ export default function PresupuestosAprobacionPage() {
                 <CheckCircle2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
                 <select
                   value={filtroTipoAprobacion}
-                  onChange={(e) => setFiltroTipoAprobacion(e.target.value as '' | 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META' | 'OFICIALIZAR_META')}
+                  onChange={(e) => setFiltroTipoAprobacion(e.target.value as '' | 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META')}
                   className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <option value="">Todos los tipos</option>
                   <option value="LICITACION_A_CONTRACTUAL">Licitación → Contractual</option>
                   <option value="CONTRACTUAL_A_META">Contractual → Meta</option>
                   <option value="NUEVA_VERSION_META">Nueva Versión Meta</option>
-                  <option value="OFICIALIZAR_META">Oficializar Meta</option>
                 </select>
               </div>
             </div>
@@ -256,22 +250,6 @@ export default function PresupuestosAprobacionPage() {
             </div>
           </div>
 
-          {/* Oficializar Meta */}
-          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow px-3 py-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-semibold text-purple-600 dark:text-purple-400 text-sm">
-                  {estadisticas.pendientesOficializarMeta}
-                </span>
-                <div className="flex items-center gap-0.5 text-xs text-[var(--text-secondary)]">
-                  <span>Meta</span>
-                  <ArrowRight className="h-2.5 w-2.5" />
-                  <span>Vigente</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 

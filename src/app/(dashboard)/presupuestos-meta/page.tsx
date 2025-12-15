@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X, Building2, FileText, Layers, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LoadingSpinner } from '@/components/ui';
 import { usePresupuestosPorFase } from '@/hooks/usePresupuestos';
 import { useProyectos } from '@/hooks';
+import { usePageState } from '@/hooks/usePageState';
 import PresupuestoGrupoCardMeta from './components/PresupuestoGrupoCardMeta';
 import ProyectoGrupoCardMeta from './components/ProyectoGrupoCardMeta';
 import type { Presupuesto } from '@/hooks/usePresupuestos';
@@ -23,11 +25,17 @@ interface ProyectoConPresupuestos {
   gruposPresupuestos: GrupoPresupuesto[];
 }
 
-export default function PresupuestosMetaPage() {
+function PresupuestosMetaContent() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filtroProyecto, setFiltroProyecto] = useState<string>('');
-  const [filtroPresupuesto, setFiltroPresupuesto] = useState<string>('');
+  const {
+    searchQuery,
+    filtroProyecto,
+    filtroPresupuesto,
+    setSearchQuery,
+    setFiltroProyecto,
+    setFiltroPresupuesto,
+    clearFilters,
+  } = usePageState('meta');
 
   // Obtener todos los proyectos para el filtro
   const { data: proyectosData } = useProyectos({
@@ -155,12 +163,6 @@ export default function PresupuestosMetaPage() {
     return filtrados;
   }, [proyectosConPresupuestos, searchQuery, filtroPresupuesto]);
 
-  const clearFilters = () => {
-    setSearchQuery('');
-    setFiltroProyecto('');
-    setFiltroPresupuesto('');
-  };
-
   const hasActiveFilters = searchQuery || filtroProyecto || filtroPresupuesto;
 
   return (
@@ -281,5 +283,19 @@ export default function PresupuestosMetaPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PresupuestosMetaPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-3">
+        <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-12 text-center">
+          <LoadingSpinner size={80} showText={true} text="Cargando..." />
+        </div>
+      </div>
+    }>
+      <PresupuestosMetaContent />
+    </Suspense>
   );
 }
