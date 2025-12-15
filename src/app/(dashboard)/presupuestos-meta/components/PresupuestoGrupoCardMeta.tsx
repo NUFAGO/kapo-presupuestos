@@ -105,25 +105,25 @@ export default function PresupuestoGrupoCardMeta({
     switch (estado) {
       case 'en_revision':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 flex-shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 flex-shrink-0 inline-block min-w-[80px] text-center">
             En Revisión
           </span>
         );
       case 'rechazado':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-red-600 dark:text-red-400 flex-shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-red-500/10 text-red-600 dark:text-red-400 flex-shrink-0 inline-block min-w-[80px] text-center">
             Rechazado
           </span>
         );
       case 'aprobado':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-500/10 text-green-600 dark:text-green-400 flex-shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-500/10 text-green-600 dark:text-green-400 flex-shrink-0 inline-block min-w-[80px] text-center">
             Aprobado
           </span>
         );
       case 'vigente':
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 flex-shrink-0">
+          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 flex-shrink-0 inline-block min-w-[80px] text-center">
             Vigente
           </span>
         );
@@ -195,7 +195,7 @@ export default function PresupuestoGrupoCardMeta({
 
 
   return (
-    <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg overflow-hidden card-shadow relative border-l-2 border-green-500/20 dark:border-green-400/20 hover:border-green-500/35 dark:hover:border-green-400/35 transition-all">
+    <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg overflow-hidden card-shadow relative">
       {/* Header del Grupo - Siempre visible */}
       <div
         className="p-4 cursor-default hover:bg-[var(--card-bg)]/50 transition-colors"
@@ -319,12 +319,16 @@ export default function PresupuestoGrupoCardMeta({
               versionesAMostrar.map((version) => (
               <div
                 key={version.id_presupuesto}
-                className="px-2 py-1.5 rounded bg-[var(--background)] card-shadow transition-all border-l-2 border-green-500/15 dark:border-green-400/15 hover:border-green-500/30 dark:hover:border-green-400/30 hover:bg-[var(--card-bg)]/30"
+                className="px-2 py-1.5 rounded bg-[var(--background)] card-shadow transition-all hover:bg-[var(--card-bg)]/30"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0 flex items-center gap-3">
-                    {/* Versión compacta - Badge sutil */}
-                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-500/10 text-green-600 dark:text-green-400 flex-shrink-0">
+                    {/* Versión compacta - Badge sutil con color según tab */}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${
+                      tabActivo === 'por_aprobar'
+                        ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                        : 'bg-green-500/10 text-green-600 dark:text-green-400'
+                    }`}>
                       V{version.version || 1}
                     </span>
                     

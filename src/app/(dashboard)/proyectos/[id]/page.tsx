@@ -53,6 +53,9 @@ export default function ProyectoDetallePage({ params }: PageProps) {
     return esVersion && !p.es_padre;
   });
 
+  // Filtrar solo los presupuestos padres (no versiones)
+  const presupuestosPadres = presupuestosEnProyecto.filter(p => p.es_padre && p.version === null);
+
   // Agrupar presupuestos por id_grupo_version para mostrar versiones
   // Incluimos padres y versiones en el mismo grupo
   const presupuestosAgrupados = presupuestosEnProyecto.reduce((acc, presupuesto) => {
@@ -138,7 +141,7 @@ export default function ProyectoDetallePage({ params }: PageProps) {
           {presupuestosEnProyecto.length > 0 && (
             <div className="flex items-center gap-3">
               <span className="text-xs text-[var(--text-secondary)]">
-                {presupuestosEnProyecto.filter(p => !p.es_padre).length} presupuesto{presupuestosEnProyecto.filter(p => !p.es_padre).length !== 1 ? 's' : ''}
+                {presupuestosPadres.length} presupuesto{presupuestosPadres.length !== 1 ? 's' : ''}
               </span>
               <button
                 onClick={() => setIsPresupuestoModalOpen(true)}
@@ -159,7 +162,7 @@ export default function ProyectoDetallePage({ params }: PageProps) {
           <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-12 text-center">
             <p className="text-xs text-red-500">Error al cargar los presupuestos</p>
           </div>
-        ) : presupuestosEnProyecto.filter(p => !p.es_padre).length === 0 ? (
+        ) : presupuestosPadres.length === 0 ? (
           <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-12">
             <div className="flex flex-col items-center justify-center space-y-4">
               <p className="text-xs text-[var(--text-secondary)]">

@@ -2127,6 +2127,47 @@ export default function EstructuraPresupuestoEditor({
         };
       });
 
+      // Detectar padres afectados por cambios de orden/padre
+      const padresAfectados = new Set<string | null>();
+      titulos.forEach(titulo => {
+        const original = titulosOriginales.find(t => t.id_titulo === titulo.id_titulo);
+        if (original) {
+          if (titulo.orden !== original.orden || titulo.id_titulo_padre !== original.id_titulo_padre) {
+            padresAfectados.add(original.id_titulo_padre);
+            padresAfectados.add(titulo.id_titulo_padre);
+          }
+        }
+      });
+      partidas.forEach(partida => {
+        const original = partidasOriginales.find(p => p.id_partida === partida.id_partida);
+        if (original) {
+          if (partida.orden !== original.orden || partida.id_titulo !== original.id_titulo || partida.id_partida_padre !== original.id_partida_padre) {
+            const tituloOriginal = titulos.find(t => t.id_titulo === original.id_titulo);
+            const tituloNuevo = titulos.find(t => t.id_titulo === partida.id_titulo);
+            if (tituloOriginal) padresAfectados.add(tituloOriginal.id_titulo_padre);
+            if (tituloNuevo) padresAfectados.add(tituloNuevo.id_titulo_padre);
+            padresAfectados.add(original.id_titulo);
+            padresAfectados.add(partida.id_titulo);
+          }
+        }
+      });
+
+      // Recalcular numero_item para todos los items de los padres afectados
+      const itemsAfectados = new Set<string>();
+      padresAfectados.forEach(idPadre => {
+        // Títulos del padre
+        titulos.filter(t => t.id_titulo_padre === idPadre).forEach(t => itemsAfectados.add(t.id_titulo));
+        // Partidas del padre
+        if (idPadre === null) {
+          // Para root, incluir partidas de todos los títulos raíz
+          titulos.filter(t => t.id_titulo_padre === null).forEach(t => {
+            partidas.filter(p => p.id_titulo === t.id_titulo && p.id_partida_padre === null).forEach(p => itemsAfectados.add(p.id_partida));
+          });
+        } else {
+          partidas.filter(p => p.id_titulo === idPadre && p.id_partida_padre === null).forEach(p => itemsAfectados.add(p.id_partida));
+        }
+      });
+
       // 3. Preparar títulos a actualizar
       const titulosActualizar = titulos
         .filter(t => !t.id_titulo.startsWith('temp_'))
@@ -2136,14 +2177,23 @@ export default function EstructuraPresupuestoEditor({
 
           // Calcular numero_item dinámicamente basado en la posición jerárquica actual
           const numeroItemCalculado = calcularNumeroItem(titulo, 'TITULO');
+          const esAfectado = itemsAfectados.has(titulo.id_titulo);
 
           const cambios: any = { id_titulo: titulo.id_titulo };
           if (titulo.descripcion !== original.descripcion) cambios.descripcion = titulo.descripcion;
           if (titulo.id_titulo_padre !== original.id_titulo_padre) cambios.id_titulo_padre = titulo.id_titulo_padre;
           if (titulo.orden !== original.orden) cambios.orden = titulo.orden;
           if (titulo.nivel !== original.nivel) cambios.nivel = titulo.nivel;
-          // Actualizar numero_item si cambió (se calcula dinámicamente en frontend)
-          if (numeroItemCalculado !== original.numero_item) cambios.numero_item = numeroItemCalculado;
+          // Actualizar numero_item si cambió O si es afectado por cambios de jerarquía
+          if (numeroItemCalculado !== original.numero_item || esAfectado) {
+            cambios.numero_item = numeroItemCalculado;
+            // Si es afectado, SIEMPRE incluir orden, padre y nivel para asegurar consistencia en el backend
+            if (esAfectado) {
+              cambios.orden = titulo.orden;
+              cambios.id_titulo_padre = titulo.id_titulo_padre;
+              cambios.nivel = titulo.nivel;
+            }
+          }
           if (titulo.tipo !== original.tipo) cambios.tipo = titulo.tipo;
           // total_parcial ya no se envía, se calcula en frontend
 
@@ -2157,7 +2207,6 @@ export default function EstructuraPresupuestoEditor({
 
           // Solo retornar si hay cambios reales (más allá del id_titulo)
           if (Object.keys(cambios).length > 1) {
-            console.log(`[FRONTEND] 🔍 Título ${titulo.id_titulo} tiene cambios:`, Object.keys(cambios).filter(k => k !== 'id_titulo'));
             return cambios;
           }
           return null;
@@ -2173,6 +2222,7 @@ export default function EstructuraPresupuestoEditor({
 
           // Calcular numero_item dinámicamente basado en la posición jerárquica actual
           const numeroItemCalculado = calcularNumeroItem(partida, 'PARTIDA');
+          const esAfectado = itemsAfectados.has(partida.id_partida);
 
           const cambios: any = { id_partida: partida.id_partida };
           if (partida.descripcion !== original.descripcion) cambios.descripcion = partida.descripcion;
@@ -2183,8 +2233,15 @@ export default function EstructuraPresupuestoEditor({
           if (partida.precio_unitario !== original.precio_unitario) cambios.precio_unitario = partida.precio_unitario;
           if (partida.unidad_medida !== original.unidad_medida) cambios.unidad_medida = partida.unidad_medida;
           if (partida.nivel_partida !== original.nivel_partida) cambios.nivel_partida = partida.nivel_partida;
-          // Actualizar numero_item si cambió (se calcula dinámicamente en frontend)
-          if (numeroItemCalculado !== original.numero_item) cambios.numero_item = numeroItemCalculado;
+          // Actualizar numero_item si cambió O si es afectado por cambios de jerarquía
+          // Si es afectado, también incluir orden y titulo para asegurar consistencia
+          if (numeroItemCalculado !== original.numero_item || esAfectado) {
+            cambios.numero_item = numeroItemCalculado;
+            // Si es afectado pero los campos no cambiaron explícitamente, incluirlos de todos modos
+            if (esAfectado && partida.orden === original.orden) cambios.orden = partida.orden;
+            if (esAfectado && partida.id_titulo === original.id_titulo) cambios.id_titulo = partida.id_titulo;
+            if (esAfectado && partida.nivel_partida === original.nivel_partida) cambios.nivel_partida = partida.nivel_partida;
+          }
           if (partida.estado !== original.estado) cambios.estado = partida.estado;
           // parcial_partida ya no se envía, se calcula en frontend
 

@@ -29,8 +29,8 @@ export default function PresupuestoCard({ presupuestos, grupo, id_proyecto }: Pr
   const [isEnviando, setIsEnviando] = useState(false);
   const [isEditPadreModalOpen, setIsEditPadreModalOpen] = useState(false);
   
-  // Estados para controlar qué fases están expandidas
-  const [fasesExpandidas, setFasesExpandidas] = useState<Set<FasePresupuesto>>(new Set());
+  // Estados para controlar qué fases están colapsadas (por defecto todas están expandidas)
+  const [fasesColapsadas, setFasesColapsadas] = useState<Set<FasePresupuesto>>(new Set());
   
   // Filtrar solo versiones (no padres) y obtener el padre
   const versiones = presupuestos.filter(p => p.version !== null && !p.es_padre);
@@ -156,7 +156,7 @@ export default function PresupuestoCard({ presupuestos, grupo, id_proyecto }: Pr
   };
   
   const toggleFase = (fase: FasePresupuesto) => {
-    setFasesExpandidas(prev => {
+    setFasesColapsadas(prev => {
       const nuevo = new Set(prev);
       if (nuevo.has(fase)) {
         nuevo.delete(fase);
@@ -168,10 +168,8 @@ export default function PresupuestoCard({ presupuestos, grupo, id_proyecto }: Pr
   };
   
   const esFaseExpandida = (fase: FasePresupuesto) => {
-    // La fase actual siempre está expandida
-    if (fase === faseActual) return true;
-    // Las demás fases solo si están en el set
-    return fasesExpandidas.has(fase);
+    // Por defecto todas las fases están expandidas, a menos que estén en el set de colapsadas
+    return !fasesColapsadas.has(fase);
   };
   
   // Detectar si una versión fue la elegida para la siguiente fase
@@ -281,22 +279,18 @@ export default function PresupuestoCard({ presupuestos, grupo, id_proyecto }: Pr
               const versionesFase = versionesPorFase[fase];
               if (versionesFase.length === 0) return null;
               
-              const esActual = fase === faseActual;
               const estaExpandida = esFaseExpandida(fase);
-              const esColapsada = !esActual && !estaExpandida;
               
               return (
                 <div key={fase} className="rounded-md overflow-hidden card-shadow">
                   {/* Header de la fase */}
                   <div
-                    className={`px-3 py-2 bg-[var(--card-bg)] flex items-center justify-between ${
-                      esActual ? '' : 'cursor-default hover:bg-[var(--hover-bg)]'
-                    }`}
-                    onClick={() => !esActual && toggleFase(fase)}
+                    className="px-3 py-2 bg-[var(--card-bg)] flex items-center justify-between cursor-default hover:bg-[var(--hover-bg)]"
+                    onClick={() => toggleFase(fase)}
                   >
                     <div className="flex items-center gap-2">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium inline-block min-w-[90px] text-center ${
                           faseColors[fase] || faseColors.BORRADOR
                         }`}
                       >
@@ -306,21 +300,19 @@ export default function PresupuestoCard({ presupuestos, grupo, id_proyecto }: Pr
                         {versionesFase.length} versión{versionesFase.length !== 1 ? 'es' : ''}
                       </span>
                     </div>
-                    {!esActual && (
-                      <button
-                        className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFase(fase);
-                        }}
-                      >
-                        {estaExpandida ? (
-                          <ChevronUp className="h-4 w-4" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4" />
-                        )}
-                      </button>
-                    )}
+                    <button
+                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFase(fase);
+                      }}
+                    >
+                      {estaExpandida ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
                   </div>
                   
                   {/* Versiones de la fase */}
