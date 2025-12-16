@@ -2,12 +2,28 @@ import { executeQuery, executeMutation } from './graphql-client';
 import {
   LIST_PROYECTOS_PAGINATED_QUERY,
   GET_PROYECTO_QUERY,
+  LIST_PROYECTOS_CON_META_VIGENTE_QUERY,
 } from '@/graphql/queries/proyecto.queries';
 import {
   ADD_PROYECTO_MUTATION,
   UPDATE_PROYECTO_MUTATION,
   DELETE_PROYECTO_MUTATION,
 } from '@/graphql/mutations/proyecto.mutations';
+
+export interface Presupuesto {
+  _id?: string;
+  id_presupuesto: string;
+  nombre_presupuesto: string;
+  fase: string;
+  version?: number | null;
+  es_padre: boolean;
+  id_grupo_version?: string;
+  total_presupuesto: number;
+  fecha_creacion: string;
+  id_presupuesto_meta_vigente?: string | null;
+  version_meta_vigente?: number | null;
+  estado?: string;
+}
 
 export interface Proyecto {
   _id: string;
@@ -29,6 +45,7 @@ export interface Proyecto {
   ppto_base: number;
   ppto_oferta: number;
   jornada: number;
+  presupuestos?: Presupuesto[];
 }
 
 export interface PaginationInfo {
@@ -43,6 +60,13 @@ export interface PaginationInfo {
 export interface PaginatedProyectoResponse {
   data: Proyecto[];
   pagination: PaginationInfo;
+}
+
+export interface PaginationInput {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface PaginationFilterInput {
@@ -109,6 +133,17 @@ class ProyectoService {
       { input }
     );
     return response.listProyectosPaginated;
+  }
+
+  /**
+   * Lista proyectos que tienen presupuestos PADRE con meta vigente (id_presupuesto_meta_vigente rellenado)
+   */
+  async listProyectosConMetaVigente(input?: PaginationInput): Promise<PaginatedProyectoResponse> {
+    const response = await executeQuery<{ listProyectosConMetaVigente: PaginatedProyectoResponse }>(
+      LIST_PROYECTOS_CON_META_VIGENTE_QUERY,
+      { input }
+    );
+    return response.listProyectosConMetaVigente;
   }
 
   /**

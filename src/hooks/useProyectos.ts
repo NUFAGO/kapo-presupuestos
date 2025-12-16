@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { proyectoService, PaginationFilterInput, ProyectoInput, ProyectoUpdateInput } from '@/services/proyecto-service';
+import { proyectoService, PaginationFilterInput, PaginationInput, ProyectoInput, ProyectoUpdateInput } from '@/services/proyecto-service';
 import toast from 'react-hot-toast';
 
 /**
@@ -9,6 +9,17 @@ export function useProyectos(input?: PaginationFilterInput) {
   return useQuery({
     queryKey: ['proyectos', input],
     queryFn: () => proyectoService.listProyectosPaginated(input),
+    staleTime: 30000, // 30 segundos
+  });
+}
+
+/**
+ * Hook para listar proyectos con presupuesto meta vigente (solo presupuestos padre)
+ */
+export function useProyectosConMetaVigente(input?: PaginationInput) {
+  return useQuery({
+    queryKey: ['proyectos-meta-vigente', input],
+    queryFn: () => proyectoService.listProyectosConMetaVigente(input),
     staleTime: 30000, // 30 segundos
   });
 }

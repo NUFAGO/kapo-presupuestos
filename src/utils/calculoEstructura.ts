@@ -67,19 +67,19 @@ function calcularPrecioRecurso(
   if (recurso.tiene_precio_override && recurso.precio_override !== undefined && recurso.precio_override !== null) {
     return recurso.precio_override;
   }
-  
+
   // PRIORIDAD 2: Si no tiene override, usar precio compartido
   if (recurso.id_precio_recurso && preciosCompartidosMap.has(recurso.id_precio_recurso)) {
     return preciosCompartidosMap.get(recurso.id_precio_recurso)!;
   }
-  
+
   // PRIORIDAD 3: Si no hay precio compartido, intentar calcular desde parcial guardado
   if (recurso.parcial !== undefined && recurso.parcial !== null) {
     const tipoRecurso = recurso.tipo_recurso || 'MATERIAL';
     const cantidad = recurso.cantidad || 0;
     const desperdicio = recurso.desperdicio_porcentaje || 0;
     const cantidadConDesperdicio = cantidad * (1 + desperdicio / 100);
-    
+
     if (tipoRecurso === 'MANO_OBRA' && rendimiento > 0 && jornada > 0) {
       // Despejar precio desde parcial: Precio = Parcial / ((1 / Rendimiento) × Jornada × Cuadrilla)
       const cuadrillaValue = recurso.cuadrilla || 1;
@@ -91,7 +91,7 @@ function calcularPrecioRecurso(
       return recurso.parcial / cantidadConDesperdicio;
     }
   }
-  
+
   // PRIORIDAD 4: Usar precio que viene del backend (ya normalizado)
   return recurso.precio || 0;
 }
@@ -111,7 +111,7 @@ function calcularSumaParcialesManoObra(
     .reduce((suma, r) => {
       if (!rendimiento || rendimiento <= 0) return suma;
       if (!jornada || jornada <= 0) return suma;
-      
+
       const precio = calcularPrecioRecurso(r, preciosCompartidosMap, rendimiento, jornada);
       const cuadrilla = r.cuadrilla || 1;
       const parcialMO = (1 / rendimiento) * jornada * cuadrilla * precio;
@@ -137,7 +137,7 @@ export function calcularParcialRecurso(
     if (recurso.precio_unitario_subpartida !== undefined && recurso.precio_unitario_subpartida !== null) {
       return roundToTwo(recurso.cantidad * recurso.precio_unitario_subpartida);
     }
-    
+
     // Si no viene calculado, calcularlo dinámicamente desde el APU de la subpartida
     if (mapaAPUs && recurso.id_partida_subpartida) {
       const apuSubpartida = mapaAPUs.get(recurso.id_partida_subpartida);
@@ -151,7 +151,7 @@ export function calcularParcialRecurso(
         return roundToTwo(recurso.cantidad * precioUnitarioSubpartida);
       }
     }
-    
+
     // Si no se encuentra el APU de la subpartida, retornar 0
     return 0;
   }
@@ -186,7 +186,7 @@ export function calcularParcialRecurso(
   // Para otros casos, usar lógica según tipo_recurso
   switch (recurso.tipo_recurso) {
     case 'MATERIAL': {
-      const cantidadConDesperdicio = recurso.cantidad * 
+      const cantidadConDesperdicio = recurso.cantidad *
         (1 + (recurso.desperdicio_porcentaje || 0) / 100);
       return roundToTwo(cantidadConDesperdicio * precio);
     }
@@ -227,7 +227,7 @@ export function calcularCostoDirectoAPU(
   );
 
   // Calcular parcial de cada recurso (pasar mapaAPUs para calcular subpartidas recursivamente)
-  const parciales = apu.recursos.map(r => 
+  const parciales = apu.recursos.map(r =>
     calcularParcialRecurso(r, apu.rendimiento, apu.jornada, preciosCompartidosMap, sumaHH, mapaAPUs)
   );
 
@@ -258,17 +258,17 @@ export function calcularPartidas(
 ): PartidaCalculo[] {
   return partidas.map(partida => {
     const apu = mapaAPUs.get(partida.id_partida);
-    
+
     if (apu) {
       // Calcular costo_directo del APU (pasar mapaAPUs para calcular subpartidas recursivamente)
       const costo_directo = calcularCostoDirectoAPU(apu, preciosCompartidosMap, mapaAPUs);
-      
+
       // precio_unitario = costo_directo
       const precio_unitario = costo_directo;
-      
+
       // parcial_partida = metrado × precio_unitario
       const parcial_partida = roundToTwo((partida.metrado || 0) * precio_unitario);
-      
+
       return {
         id_partida: partida.id_partida,
         id_titulo: partida.id_titulo,
@@ -278,7 +278,7 @@ export function calcularPartidas(
         parcial_partida
       };
     }
-    
+
     // Si no tiene APU, valores por defecto
     return {
       id_partida: partida.id_partida,
@@ -351,14 +351,14 @@ function calcularTotalTitulo(
   // Suma de parciales de partidas directas (sin padre)
   const partidasDirectas = partidasPorTitulo.get(id_titulo) || [];
   const sumaPartidas = partidasDirectas.reduce((suma, p) => suma + p.parcial_partida, 0);
-  
+
   // Suma de totales de títulos hijos
   const hijos = titulosHijos.get(id_titulo) || [];
   const sumaHijos = hijos.reduce((suma, hijo) => {
     const totalHijo = totalesCalculados.get(hijo.id_titulo) || 0;
     return suma + totalHijo;
   }, 0);
-  
+
   // Redondear a 2 decimales
   return roundToTwo(sumaPartidas + sumaHijos);
 }
@@ -372,10 +372,10 @@ export function propagarTotalesTitulos(
   partidas: PartidaCalculo[]
 ): Map<string, number> {
   const { partidasPorTitulo, titulosHijos, tituloPadre } = crearMapasReferencia(titulos, partidas);
-  
+
   // Mapa para almacenar totales calculados
   const totalesCalculados = new Map<string, number>();
-  
+
   // Función recursiva para calcular total de un título y propagar hacia arriba
   const calcularYPropagar = (id_titulo: string, visitados: Set<string> = new Set(), esPropagacion: boolean = false): number => {
     // Protección contra ciclos
@@ -383,9 +383,9 @@ export function propagarTotalesTitulos(
       console.warn(`Ciclo detectado en jerarquía de títulos: ${id_titulo}`);
       return 0;
     }
-    
+
     visitados.add(id_titulo);
-    
+
     // Si ya fue calculado Y es una propagación (un hijo se acaba de calcular),
     // debemos RECALCULAR el padre para incluir todos los hijos actualizados
     if (totalesCalculados.has(id_titulo) && esPropagacion) {
@@ -396,39 +396,39 @@ export function propagarTotalesTitulos(
       visitados.delete(id_titulo);
       return totalesCalculados.get(id_titulo)!;
     }
-    
+
     // Calcular total del título (siempre recalcula si es propagación)
     const total = calcularTotalTitulo(id_titulo, partidasPorTitulo, titulosHijos, totalesCalculados);
     totalesCalculados.set(id_titulo, total);
-    
+
     // Si tiene padre, propagar hacia arriba (marcando que es propagación)
     const padre = tituloPadre.get(id_titulo);
     if (padre) {
       calcularYPropagar(padre, visitados, true); // ✅ esPropagacion = true para forzar recálculo
     }
-    
+
     visitados.delete(id_titulo);
     return total;
   };
-  
+
   // Calcular totales empezando desde las hojas (títulos sin hijos)
   const titulosSinHijos = titulos.filter(t => {
     const hijos = titulosHijos.get(t.id_titulo) || [];
     return hijos.length === 0;
   });
-  
+
   // Calcular desde cada hoja
   titulosSinHijos.forEach(titulo => {
     calcularYPropagar(titulo.id_titulo);
   });
-  
+
   // Asegurar que todos los títulos tengan total calculado
   titulos.forEach(titulo => {
     if (!totalesCalculados.has(titulo.id_titulo)) {
       calcularYPropagar(titulo.id_titulo);
     }
   });
-  
+
   return totalesCalculados;
 }
 
@@ -444,7 +444,7 @@ export function calcularParcialPresupuesto(
   const suma = titulosRaiz.reduce((suma, titulo) => {
     return suma + (totalesTitulos.get(titulo.id_titulo) || 0);
   }, 0);
-  
+
   return roundToTwo(suma);
 }
 

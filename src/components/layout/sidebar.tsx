@@ -15,16 +15,25 @@ import {
   LogOut,
   X,
   FolderKanban,
-  CheckCircle2
+  CheckCircle2,
+  DollarSign,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface NavItem {
+interface NavSubItem {
   name: string;
   href: string;
+}
+
+interface NavItem {
+  name: string;
+  href?: string;
   icon: React.ComponentType<{ className?: string }>;
+  subItems?: NavSubItem[];
 }
 
 const navItems: NavItem[] = [
@@ -55,9 +64,19 @@ const navItems: NavItem[] = [
     icon: Target,
   },
   {
-    name: 'Aprobación de Presupuestos',
+    name: 'Aprobaciones',
     href: '/presupuestos-aprobacion',
     icon: CheckCircle2,
+  },
+  {
+    name: 'Costos',
+    icon: DollarSign,
+    subItems: [
+      {
+        name: 'Control Costos',
+        href: '/costos/control-costos',
+      },
+    ],
   },
 ];
 
@@ -68,6 +87,7 @@ export function Sidebar() {
   const { logout } = useAuth();
   const router = useRouter();
   const [isMobile, setIsMobile] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -96,6 +116,30 @@ export function Sidebar() {
     // Para otras rutas, verificar si el pathname coincide exactamente o es una subruta
     return cleanPathname === cleanHref || cleanPathname.startsWith(cleanHref + '/');
   };
+
+  const toggleExpanded = (itemName: string) => {
+    setExpandedItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemName)) {
+        newSet.delete(itemName);
+      } else {
+        newSet.add(itemName);
+      }
+      return newSet;
+    });
+  };
+
+  // Auto-expandir items que tienen una subruta activa
+  useEffect(() => {
+    navItems.forEach((item) => {
+      if (item.subItems) {
+        const hasActiveSubItem = item.subItems.some((subItem) => isRouteActive(subItem.href));
+        if (hasActiveSubItem) {
+          setExpandedItems((prev) => new Set(prev).add(item.name));
+        }
+      }
+    });
+  }, [pathname]);
 
   return (
     <>
@@ -177,12 +221,89 @@ export function Sidebar() {
           <div className="flex flex-col space-y-1 p-3 flex-1 overflow-x-hidden">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = isRouteActive(item.href);
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isExpanded = expandedItems.has(item.name);
+              
+              // Si tiene subitems, mostrar como menú desplegable
+              if (hasSubItems) {
+                const hasActiveSubItem = item.subItems!.some((subItem) => isRouteActive(subItem.href));
+                
+                return (
+                  <div key={item.name} className="flex flex-col">
+                    <button
+                      onClick={() => {
+                        if (!isCollapsed || isMobile) {
+                          toggleExpanded(item.name);
+                        }
+                      }}
+                      className={clsx(
+                        'flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium relative transition-all duration-300 ease-in-out sidebar-nav-item group w-full',
+                        {
+                          'bg-[var(--sidebar-active-bg-light)] text-[var(--sidebar-active-text-light)] sidebar-nav-item-active border-l-[3px] border-[var(--sidebar-active-bg)]': hasActiveSubItem,
+                          'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--text-primary)]': !hasActiveSubItem,
+                          'justify-center': isCollapsed && !isMobile,
+                        }
+                      )}
+                      title={isCollapsed && !isMobile ? item.name : undefined}
+                    >
+                      <Icon className={clsx(
+                        'w-5 h-5 flex-shrink-0 transition-all duration-300 ease-in-out',
+                        {
+                          'text-[var(--sidebar-active-text-light)]': hasActiveSubItem,
+                          'text-[var(--text-secondary)] group-hover:scale-110 group-hover:text-[var(--text-primary)]': !hasActiveSubItem,
+                        }
+                      )} />
+                      {(!isCollapsed || isMobile) && (
+                        <>
+                          <span className="truncate transition-all duration-300 ease-in-out flex-1 text-left">{item.name}</span>
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4 flex-shrink-0" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 flex-shrink-0" />
+                          )}
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* Subitems */}
+                    {(!isCollapsed || isMobile) && isExpanded && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        {item.subItems!.map((subItem) => {
+                          const subActive = isRouteActive(subItem.href);
+                          return (
+                            <Link
+                              key={subItem.href}
+                              href={subItem.href}
+                              onClick={() => {
+                                if (isMobile) {
+                                  closeSidebar();
+                                }
+                              }}
+                              className={clsx(
+                                'flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium relative transition-all duration-300 ease-in-out sidebar-nav-item group',
+                                {
+                                  'bg-[var(--hover-bg)] text-[var(--text-primary)]': subActive,
+                                  'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--text-primary)]': !subActive,
+                                }
+                              )}
+                            >
+                              <span className="truncate transition-all duration-300 ease-in-out">{subItem.name}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              
+              // Si no tiene subitems, mostrar como link normal
+              const active = item.href ? isRouteActive(item.href) : false;
               
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={item.href || item.name}
+                  href={item.href || '#'}
                   onClick={() => {
                     if (isMobile) {
                       closeSidebar();

@@ -23,7 +23,7 @@ const MODAL_SIZE_CLASSES: Record<ModalSize, string> = {
   md: 'max-w-2xl',
   lg: 'max-w-4xl',
   xl: 'max-w-7xl',
-  full: 'max-w-full mx-4',
+  full: 'max-w-full mx-[100px]',
 };
 
 export default function Modal({
@@ -94,7 +94,7 @@ export default function Modal({
         onClick={closeOnClickOutside ? onClose : undefined}
       />
 
-      <div className="flex min-h-full items-center justify-center p-4 text-center">
+      <div className="flex min-h-full items-center justify-center p-2 text-center">
         <div
           className={`relative transform overflow-hidden rounded-lg bg-[var(--background)] border border-[var(--border-color)] text-left align-bottom transition-all duration-300 ease-out w-full shadow-lg shadow-black/4 ${MODAL_SIZE_CLASSES[size]}`}
           style={{
@@ -102,7 +102,8 @@ export default function Modal({
             transform: isAnimating ? 'translateY(0) scale(1)' : 'translateY(-20px) scale(0.98)',
             display: 'flex',
             flexDirection: 'column',
-            maxHeight: '90vh',
+            maxHeight: '91vh',
+            height: '91vh',
           }}
           onClick={(e) => e.stopPropagation()}
         >
