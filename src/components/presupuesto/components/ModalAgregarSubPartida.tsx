@@ -118,7 +118,7 @@ export default function ModalAgregarSubPartida({
     if (subPartidaParaEditar && isOpen) {
       return;
     }
-    
+
     if (partidaSeleccionada) {
       refetchApu();
       // Inicializar descripción con la descripción de la partida seleccionada si no hay una descripción ya establecida
@@ -146,26 +146,26 @@ export default function ModalAgregarSubPartida({
     if (subPartidaParaEditar && isOpen) {
       // Guardar el ID de la subpartida que se está editando
       setIdSubPartidaEditando(subPartidaParaEditar.id);
-      
+
       // Cargar la descripción de la subpartida si existe
       if (subPartidaParaEditar.descripcion) {
         setDescripcionSubpartida(subPartidaParaEditar.descripcion);
       }
-      
+
       // Buscar la partida original que se usó para crear la subpartida
       // IMPORTANTE: usar idPartidaOriginal, no el id de la subpartida (que es temporal)
       let idPartidaABuscar = subPartidaParaEditar.idPartidaOriginal;
-      
+
       // Si no hay idPartidaOriginal, intentar extraerlo de los recursos
       if (!idPartidaABuscar && subPartidaParaEditar.recursos && subPartidaParaEditar.recursos.length > 0) {
         idPartidaABuscar = (subPartidaParaEditar.recursos[0] as any).id_partida_original || null;
       }
-      
+
       // Si aún no hay, buscar en la estructura de datos de la subpartida
       if (!idPartidaABuscar && (subPartidaParaEditar as any).id_partida_original) {
         idPartidaABuscar = (subPartidaParaEditar as any).id_partida_original;
       }
-      
+
       if (idPartidaABuscar) {
         const partidaEncontrada = partidas.find(p => p.id_partida === idPartidaABuscar);
         if (partidaEncontrada) {
@@ -173,7 +173,7 @@ export default function ModalAgregarSubPartida({
           setPartidaSeleccionada(partidaEncontrada);
         }
       }
-      
+
       // PRIORIDAD: Siempre usar apusCalculados (datos calculados del frontend con precios compartidos actualizados)
       // NO usar datos locales porque pueden tener precios desactualizados
       const cargarDatos = async () => {
@@ -184,7 +184,7 @@ export default function ModalAgregarSubPartida({
           cantidadApus: apusCalculados?.length || 0,
           tieneRecursosLocales: !!(subPartidaParaEditar.recursos && subPartidaParaEditar.recursos.length > 0),
         });
-        
+
         // SOLO si es temp_id, usar datos locales (aún no existe en backend)
         // Para subpartidas reales, SIEMPRE ignorar datos locales y usar apusCalculados
         if (subPartidaParaEditar.id && subPartidaParaEditar.id.startsWith('temp_')) {
@@ -192,12 +192,12 @@ export default function ModalAgregarSubPartida({
           if (subPartidaParaEditar.recursos && subPartidaParaEditar.recursos.length > 0) {
             const rendimientoGuardado = (subPartidaParaEditar as any).rendimiento || 1.0;
             const jornadaGuardada = (subPartidaParaEditar as any).jornada || 8;
-            
+
             setRendimiento(rendimientoGuardado);
             setJornada(jornadaGuardada);
             setRendimientoInput(String(rendimientoGuardado));
             setJornadaInput(String(jornadaGuardada));
-            
+
             const recursosEditable: RecursoAPUEditable[] = subPartidaParaEditar.recursos.map((r, index) => {
               const recurso: RecursoAPUEditable = {
                 id_recurso_apu: r.id_recurso_apu || `temp-${index}`,
@@ -217,11 +217,11 @@ export default function ModalAgregarSubPartida({
                 orden: r.orden || index,
                 esNuevo: false,
               };
-              
+
               recurso.parcial = calcularParcial(recurso);
               return recurso;
             });
-            
+
             setRecursosEditables(recursosEditable);
             setValoresOriginales({
               rendimiento: rendimientoGuardado,
@@ -232,70 +232,34 @@ export default function ModalAgregarSubPartida({
             return;
           }
         }
-        
-        // Para subpartidas reales, SIEMPRE usar apusCalculados (IGNORAR datos locales completamente)
+
+        // Para subpartidas existentes, PRIORIDAD: Usar datos de subPartidaParaEditar.recursos
+        // que ya contienen precios sincronizados del panel principal
         if (subPartidaParaEditar.id && !subPartidaParaEditar.id.startsWith('temp_')) {
-          console.log(`[ModalAgregarSubPartida] 🔄 Buscando en apusCalculados (IGNORANDO datos locales): ${subPartidaParaEditar.id}`);
-          
-          if (!apusCalculados || apusCalculados.length === 0) {
-            console.warn(`[ModalAgregarSubPartida] ⚠️ No hay apusCalculados disponibles`);
-            return;
-          }
-          
-          // Buscar en apusCalculados usando el ID de la subpartida
-          const apuSubpartidaCalculado = apusCalculados.find(apu => apu.id_partida === subPartidaParaEditar.id);
-          
-          if (apuSubpartidaCalculado) {
-            console.log(`[ModalAgregarSubPartida] ✅ APU encontrado en apusCalculados:`, {
-              id_partida: apuSubpartidaCalculado.id_partida,
-              recursosCount: apuSubpartidaCalculado.recursos?.length || 0,
-              rendimiento: apuSubpartidaCalculado.rendimiento,
-              jornada: apuSubpartidaCalculado.jornada,
-            });
-            
-            // Mostrar precios de los recursos para debugging
-            if (apuSubpartidaCalculado.recursos) {
-              apuSubpartidaCalculado.recursos.forEach((r, idx) => {
-                console.log(`[ModalAgregarSubPartida] 📊 Recurso ${idx + 1}:`, {
-                  descripcion: r.descripcion,
-                  precio: r.precio,
-                  cantidad: r.cantidad,
-                  parcial: r.parcial,
-                  tiene_precio_override: r.tiene_precio_override,
-                  id_precio_recurso: r.id_precio_recurso,
-                });
-              });
-            }
-            
-            const partidaSubpartida = partidas.find(p => p.id_partida === subPartidaParaEditar.id);
-            if (partidaSubpartida && partidaSubpartida.descripcion) {
-              setDescripcionSubpartida(partidaSubpartida.descripcion);
-            } else if (subPartidaParaEditar.descripcion) {
-              setDescripcionSubpartida(subPartidaParaEditar.descripcion);
-            }
-            
-            const rendimientoBackend = apuSubpartidaCalculado.rendimiento || 1.0;
-            const jornadaBackend = apuSubpartidaCalculado.jornada || 8;
-            
-            setRendimiento(rendimientoBackend);
-            setJornada(jornadaBackend);
-            setRendimientoInput(String(rendimientoBackend));
-            setJornadaInput(String(jornadaBackend));
-            
-            const recursosEditable: RecursoAPUEditable[] = (apuSubpartidaCalculado.recursos || []).map((r: any, index: number) => {
-              // Siempre usar el precio que viene de apusCalculados (ya está calculado con precios compartidos actualizados)
-              // NO usar precioSync porque apusCalculados ya tiene los precios correctos
-              const precioFinal = r.precio || 0;
-              
+          console.log(`[ModalAgregarSubPartida] 🔄 Usando recursos sincronizados de subPartidaParaEditar: ${subPartidaParaEditar.id}`);
+
+          // Si hay recursos en subPartidaParaEditar, usarlos (tienen precios sincronizados)
+          if (subPartidaParaEditar.recursos && subPartidaParaEditar.recursos.length > 0) {
+            const rendimientoGuardado = subPartidaParaEditar.rendimiento || 1.0;
+            const jornadaGuardada = subPartidaParaEditar.jornada || 8;
+
+            console.log(`[ModalAgregarSubPartida] ✅ Usando ${subPartidaParaEditar.recursos.length} recursos con precios sincronizados del panel`);
+
+            setRendimiento(rendimientoGuardado);
+            setJornada(jornadaGuardada);
+            setRendimientoInput(String(rendimientoGuardado));
+            setJornadaInput(String(jornadaGuardada));
+
+            const recursosEditable: RecursoAPUEditable[] = subPartidaParaEditar.recursos.map((r, index) => {
               const recurso: RecursoAPUEditable = {
-                id_recurso_apu: r.id_recurso_apu,
+                id_recurso_apu: r.id_recurso_apu || `temp-${index}`,
                 recurso_id: r.recurso_id || '',
                 codigo_recurso: r.codigo_recurso || '',
                 descripcion: r.descripcion || '',
                 tipo_recurso: r.tipo_recurso || 'MATERIAL',
                 unidad_medida: r.unidad_medida || '',
                 id_precio_recurso: r.id_precio_recurso || null,
-                precio: precioFinal,
+                precio: r.precio || 0,
                 tiene_precio_override: r.tiene_precio_override || false,
                 precio_override: r.precio_override,
                 cuadrilla: r.cuadrilla,
@@ -305,37 +269,91 @@ export default function ModalAgregarSubPartida({
                 orden: r.orden || index,
                 esNuevo: false,
               };
-              
+
+              console.log(`[ModalAgregarSubPartida] 📊 Recurso ${index + 1} (sincronizado):`, {
+                descripcion: recurso.descripcion,
+                precio: recurso.precio,
+                tiene_override: recurso.tiene_precio_override,
+              });
+
               recurso.parcial = calcularParcial(recurso);
               return recurso;
             });
-            
+
             setRecursosEditables(recursosEditable);
-            
             setValoresOriginales({
-              rendimiento: rendimientoBackend,
-              jornada: jornadaBackend,
+              rendimiento: rendimientoGuardado,
+              jornada: jornadaGuardada,
               recursos: JSON.parse(JSON.stringify(recursosEditable)),
             });
             setHasChanges(false);
             return;
-          } else {
-            console.warn(`[ModalAgregarSubPartida] ⚠️ APU de subpartida NO encontrado en apusCalculados:`, {
-              idBuscado: subPartidaParaEditar.id,
-              idsDisponibles: apusCalculados.map(apu => apu.id_partida).slice(0, 5),
-            });
+          }
+
+          // FALLBACK: Si no hay recursos en subPartidaParaEditar, buscar en apusCalculados
+          console.log(`[ModalAgregarSubPartida] ⚠️ No hay recursos en subPartidaParaEditar, buscando en apusCalculados`);
+
+          if (apusCalculados && apusCalculados.length > 0) {
+            const apuSubpartidaCalculado = apusCalculados.find(apu => apu.id_partida === subPartidaParaEditar.id);
+
+            if (apuSubpartidaCalculado) {
+              console.log(`[ModalAgregarSubPartida] ✅ APU encontrado en apusCalculados (fallback)`);
+
+              const rendimientoBackend = apuSubpartidaCalculado.rendimiento || 1.0;
+              const jornadaBackend = apuSubpartidaCalculado.jornada || 8;
+
+              setRendimiento(rendimientoBackend);
+              setJornada(jornadaBackend);
+              setRendimientoInput(String(rendimientoBackend));
+              setJornadaInput(String(jornadaBackend));
+
+              const recursosEditable: RecursoAPUEditable[] = (apuSubpartidaCalculado.recursos || []).map((r: any, index: number) => {
+                const precioFinal = r.precio || 0;
+
+                const recurso: RecursoAPUEditable = {
+                  id_recurso_apu: r.id_recurso_apu,
+                  recurso_id: r.recurso_id || '',
+                  codigo_recurso: r.codigo_recurso || '',
+                  descripcion: r.descripcion || '',
+                  tipo_recurso: r.tipo_recurso || 'MATERIAL',
+                  unidad_medida: r.unidad_medida || '',
+                  id_precio_recurso: r.id_precio_recurso || null,
+                  precio: precioFinal,
+                  tiene_precio_override: r.tiene_precio_override || false,
+                  precio_override: r.precio_override,
+                  cuadrilla: r.cuadrilla,
+                  cantidad: r.cantidad || 0,
+                  desperdicio_porcentaje: r.desperdicio_porcentaje || 0,
+                  parcial: 0,
+                  orden: r.orden || index,
+                  esNuevo: false,
+                };
+
+                recurso.parcial = calcularParcial(recurso);
+                return recurso;
+              });
+
+              setRecursosEditables(recursosEditable);
+              setValoresOriginales({
+                rendimiento: rendimientoBackend,
+                jornada: jornadaBackend,
+                recursos: JSON.parse(JSON.stringify(recursosEditable)),
+              });
+              setHasChanges(false);
+              return;
+            }
           }
         }
-        
+
         // Fallback: Si no hay datos locales ni backend, usar valores por defecto
         const rendimientoGuardado = (subPartidaParaEditar as any).rendimiento || 1.0;
         const jornadaGuardada = (subPartidaParaEditar as any).jornada || 8;
-        
+
         setRendimiento(rendimientoGuardado);
         setJornada(jornadaGuardada);
         setRendimientoInput(String(rendimientoGuardado));
         setJornadaInput(String(jornadaGuardada));
-        
+
         setRecursosEditables([]);
         setValoresOriginales({
           rendimiento: rendimientoGuardado,
@@ -344,7 +362,7 @@ export default function ModalAgregarSubPartida({
         });
         setHasChanges(false);
       };
-      
+
       cargarDatos();
     } else if (!subPartidaParaEditar) {
       // Si no se está editando, limpiar el ID
@@ -359,7 +377,7 @@ export default function ModalAgregarSubPartida({
     if (subPartidaParaEditar && isOpen) {
       return;
     }
-    
+
     if (apuData && !subPartidaParaEditar) {
       const nuevoRendimiento = apuData.rendimiento || 1.0;
       const nuevaJornada = apuData.jornada || 8;
@@ -371,7 +389,7 @@ export default function ModalAgregarSubPartida({
         // Usar precio del contexto si existe, sino usar precio del backend
         const precioSincronizado = r.recurso_id ? precioSync.obtenerPrecio(r.recurso_id) : undefined;
         const precioFinal = precioSincronizado !== undefined ? precioSincronizado : (r.precio || 0);
-        
+
         const recurso: RecursoAPUEditable = {
           id_recurso_apu: r.id_recurso_apu,
           recurso_id: r.recurso_id || '',
@@ -388,13 +406,13 @@ export default function ModalAgregarSubPartida({
           orden: r.orden,
           esNuevo: false,
         };
-        
+
         // Calcular parcial después de crear el objeto completo
         recurso.parcial = calcularParcial(recurso);
         return recurso;
       });
       setRecursosEditables(recursosEditable);
-      
+
       setValoresOriginales({
         rendimiento: nuevoRendimiento,
         jornada: nuevaJornada,
@@ -422,7 +440,7 @@ export default function ModalAgregarSubPartida({
   // Pero lo mantenemos para actualizar el contexto si hay precios nuevos que no están sincronizados
   useEffect(() => {
     if (recursosEditables.length === 0) return;
-    
+
     // Usar queueMicrotask para ejecutar después del render (más eficiente que setTimeout)
     queueMicrotask(() => {
       recursosEditables.forEach(r => {
@@ -444,7 +462,7 @@ export default function ModalAgregarSubPartida({
   useEffect(() => {
     const desuscripciones: (() => void)[] = [];
     const recursoIdsSuscritos = new Set<string>();
-    
+
     recursosEditables.forEach(r => {
       if (r.recurso_id && !recursoIdsSuscritos.has(r.recurso_id)) {
         recursoIdsSuscritos.add(r.recurso_id);
@@ -488,7 +506,7 @@ export default function ModalAgregarSubPartida({
               }
               return recurso;
             });
-            
+
             if (hayCambios) {
               setHasChanges(true);
             }
@@ -498,7 +516,7 @@ export default function ModalAgregarSubPartida({
         desuscripciones.push(desuscripcion);
       }
     });
-    
+
     return () => {
       desuscripciones.forEach(desuscripcion => desuscripcion());
     };
@@ -644,7 +662,7 @@ export default function ModalAgregarSubPartida({
             const unidadMedida = recurso.unidad?.nombre || '';
             const precioFinal =
               tipoRecurso === 'EQUIPO' &&
-              (unidadMedida === '%mo' || unidadMedida?.toLowerCase() === '%mo')
+                (unidadMedida === '%mo' || unidadMedida?.toLowerCase() === '%mo')
                 ? roundToTwo(sumaHHManoObra)
                 : roundToTwo(precioInicial);
 
@@ -660,7 +678,7 @@ export default function ModalAgregarSubPartida({
               parcial: 0, // Se calculará después
               enEdicion: false,
             };
-            
+
             // Calcular parcial después de crear el objeto completo
             nuevoRecurso.parcial = calcularParcial(nuevoRecurso);
 
@@ -749,12 +767,12 @@ export default function ModalAgregarSubPartida({
                 (nuevoRecurso as any)[campo] = numValor;
               }
             } else {
-            if (campo === 'cantidad') {
-              nuevoRecurso.cantidad = truncateToFour(numValor);
-            } else if (campo === 'precio') {
-              nuevoRecurso.precio = roundToTwo(numValor);
-              // NO actualizar contexto aquí - solo se actualiza cuando se guarda la subpartida
-            } else if (campo === 'cuadrilla') {
+              if (campo === 'cantidad') {
+                nuevoRecurso.cantidad = truncateToFour(numValor);
+              } else if (campo === 'precio') {
+                nuevoRecurso.precio = roundToTwo(numValor);
+                // NO actualizar contexto aquí - solo se actualiza cuando se guarda la subpartida
+              } else if (campo === 'cuadrilla') {
                 nuevoRecurso.cuadrilla = truncateToFour(numValor);
               } else if (campo === 'desperdicio_porcentaje') {
                 nuevoRecurso.desperdicio_porcentaje = truncateToFour(numValor);
@@ -830,10 +848,10 @@ export default function ModalAgregarSubPartida({
   const handleEliminarRecurso = (recursoId: string) => {
     const recursoAEliminar = recursosEditables.find(r => r.id_recurso_apu === recursoId);
     const unidadMedidaEliminado = recursoAEliminar?.unidad_medida?.toLowerCase() || '';
-    
+
     setRecursosEditables((prev) => {
       const recursosActualizados = prev.filter((r) => r.id_recurso_apu !== recursoId);
-      
+
       // Si el recurso eliminado tenía unidad "hh", recalcular recursos con "%mo"
       if (unidadMedidaEliminado === 'hh') {
         // Calcular nueva suma de HH después de eliminar
@@ -846,7 +864,7 @@ export default function ModalAgregarSubPartida({
             const parcialMO = (1 / rendimiento) * jornada * cuadrillaValue * (r.precio || 0);
             return suma + parcialMO;
           }, 0);
-        
+
         // Actualizar precio y parcial de recursos con "%mo"
         return recursosActualizados.map(r => {
           if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
@@ -861,7 +879,7 @@ export default function ModalAgregarSubPartida({
           return r;
         });
       }
-      
+
       return recursosActualizados;
     });
     setHasChanges(true);
@@ -918,7 +936,7 @@ export default function ModalAgregarSubPartida({
 
     // Si se está editando una subpartida existente, actualizarla en lugar de crear una nueva
     if (idSubPartidaEditando && onActualizarSubPartida) {
-      
+
       const subPartidaActualizada: PartidaLocal = {
         id_partida: idSubPartidaEditando, // Mantener el mismo ID
         id_presupuesto: id_presupuesto,
@@ -935,7 +953,7 @@ export default function ModalAgregarSubPartida({
         orden: 0, // Se calculará en el padre
         estado: 'Activa',
         // Guardar TODOS los recursos con el ID de la partida original
-        recursos: recursosEditables.map((r) => ({ 
+        recursos: recursosEditables.map((r) => ({
           ...r,
           id_partida_original: partidaSeleccionada.id_partida, // Guardar el ID de la partida original en cada recurso
         })),
@@ -945,14 +963,14 @@ export default function ModalAgregarSubPartida({
         // Guardar el ID de la partida original directamente
         id_partida_original: partidaSeleccionada.id_partida,
       };
-      
+
       // Actualizar precios en el contexto de sincronización antes de guardar
       recursosEditables.forEach(r => {
         if (r.recurso_id && r.precio !== undefined && r.precio !== null) {
           precioSync.actualizarPrecio(r.recurso_id, r.precio, 'ModalAgregarSubPartida-guardar');
         }
       });
-      
+
       onActualizarSubPartida(idSubPartidaEditando, subPartidaActualizada);
       handleClose();
       return;
@@ -979,7 +997,7 @@ export default function ModalAgregarSubPartida({
       orden: 0, // Se calculará en el padre
       estado: 'Activa',
       // Guardar TODOS los recursos con el ID de la partida original
-      recursos: recursosEditables.map((r) => ({ 
+      recursos: recursosEditables.map((r) => ({
         ...r,
         id_partida_original: partidaSeleccionada.id_partida, // Guardar el ID de la partida original para poder editarla después
       })),
@@ -1061,8 +1079,8 @@ export default function ModalAgregarSubPartida({
         esModoLectura
           ? "Ver Sub Partida"
           : estaEditando
-          ? "Editar Sub Partida"
-          : "Agregar Sub Partida"
+            ? "Editar Sub Partida"
+            : "Agregar Sub Partida"
       }
       size="xl"
       footer={null}
@@ -1659,12 +1677,12 @@ export default function ModalAgregarSubPartida({
                   !partidaSeleccionada
                     ? 'Seleccione una partida'
                     : !id_partida_padre
-                    ? 'No hay partida padre seleccionada'
-                    : recursosEditables.length === 0
-                    ? 'Debe agregar al menos un recurso'
-                    : estaEditando
-                    ? 'Actualizar sub partida'
-                    : 'Agregar sub partida'
+                      ? 'No hay partida padre seleccionada'
+                      : recursosEditables.length === 0
+                        ? 'Debe agregar al menos un recurso'
+                        : estaEditando
+                          ? 'Actualizar sub partida'
+                          : 'Agregar sub partida'
                 }
               >
                 {estaEditando ? (

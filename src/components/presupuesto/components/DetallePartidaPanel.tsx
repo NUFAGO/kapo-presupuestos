@@ -165,10 +165,10 @@ export default function DetallePartidaPanel({
   const { data: apuDataBackend, isLoading: isLoadingApu, refetch: refetchApu } = useApuByPartida(
     shouldFetchFromBackend ? id_partida : null
   );
-  
+
   // Priorizar apuCalculado sobre apuDataBackend
   const apuData = apuCalculado || apuDataBackend;
-  
+
 
   const createApu = useCreateApu();
   const updateApu = useUpdateApu();
@@ -265,10 +265,10 @@ export default function DetallePartidaPanel({
             if (r.id_partida_subpartida.startsWith('temp_')) {
               // Buscar en subpartidasPendientes
               const subpartidaLocal = subpartidasPendientes?.find(sp => sp.id_partida === r.id_partida_subpartida) ||
-                                      (subPartidaParaActualizar?.id_partida === r.id_partida_subpartida ? subPartidaParaActualizar : null);
-              
+                (subPartidaParaActualizar?.id_partida === r.id_partida_subpartida ? subPartidaParaActualizar : null);
+
               if (subpartidaLocal && subpartidaLocal.recursos && subpartidaLocal.recursos.length > 0) {
-                
+
                 // Convertir recursos locales a RecursoAPUEditable
                 const recursosSubpartida: RecursoAPUEditable[] = subpartidaLocal.recursos.map((sr: any) => {
                   const recursoSub: RecursoAPUEditable = {
@@ -293,12 +293,12 @@ export default function DetallePartidaPanel({
                   };
                   return recursoSub;
                 });
-                
+
                 recursoBase.recursosSubpartida = recursosSubpartida;
                 recursoBase.rendimientoSubpartida = subpartidaLocal.rendimiento || 1.0;
                 recursoBase.jornadaSubpartida = subpartidaLocal.jornada || 8;
                 recursoBase.id_partida_original = subpartidaLocal.id_partida_original || id_partida || undefined;
-                
+
                 // Continuar con el siguiente recurso
                 return recursoBase;
               } else {
@@ -330,12 +330,12 @@ export default function DetallePartidaPanel({
                       };
                       return recursoSub;
                     });
-                    
+
                     recursoBase.recursosSubpartida = recursosSubpartida;
                     recursoBase.rendimientoSubpartida = apuSubpartidaCalculado.rendimiento || 1.0;
                     recursoBase.jornadaSubpartida = apuSubpartidaCalculado.jornada || 8;
                     recursoBase.id_partida_original = id_partida || undefined;
-                    
+
                     return recursoBase;
                   }
                 }
@@ -343,11 +343,11 @@ export default function DetallePartidaPanel({
                 return recursoBase;
               }
             }
-            
+
             // Si NO es temp_id, primero buscar en apusCalculados (datos calculados del frontend)
             // Solo hacer query al backend si no se encuentra en apusCalculados
             let subpartidaApu: any = null;
-            
+
             // Buscar en apusCalculados primero
             if (apusCalculados && r.id_partida_subpartida) {
               const apuSubpartidaCalculado = apusCalculados.find(apu => apu.id_partida === r.id_partida_subpartida);
@@ -355,7 +355,7 @@ export default function DetallePartidaPanel({
                 subpartidaApu = apuSubpartidaCalculado;
               }
             }
-            
+
             // Si no se encontró en apusCalculados, hacer query al backend
             if (!subpartidaApu) {
               try {
@@ -374,68 +374,68 @@ export default function DetallePartidaPanel({
 
             if (subpartidaApu) {
 
-                // Convertir recursos del APU de la subpartida a RecursoAPUEditable
-                const recursosSubpartida: RecursoAPUEditable[] = (subpartidaApu.recursos || []).map((sr: any) => {
-                  const recursoSub: RecursoAPUEditable = {
-                    id_recurso_apu: sr.id_recurso_apu,
-                    recurso_id: sr.recurso_id || '',
-                    codigo_recurso: sr.codigo_recurso || '',
-                    descripcion: sr.descripcion,
-                    tipo_recurso: sr.tipo_recurso,
-                    unidad_medida: sr.unidad_medida,
-                    id_precio_recurso: sr.id_precio_recurso,
-                    precio: sr.precio || 0,
-                    cuadrilla: sr.cuadrilla,
-                    cantidad: sr.cantidad,
-                    desperdicio_porcentaje: sr.desperdicio_porcentaje || 0,
-                    parcial: 0, // Se calculará después
-                    orden: sr.orden,
-                    enEdicion: false,
-                    esNuevo: false,
-                    esSubpartida: false,
-                    tiene_precio_override: sr.tiene_precio_override || false,
-                    precio_override: sr.precio_override,
-                  };
+              // Convertir recursos del APU de la subpartida a RecursoAPUEditable
+              const recursosSubpartida: RecursoAPUEditable[] = (subpartidaApu.recursos || []).map((sr: any) => {
+                const recursoSub: RecursoAPUEditable = {
+                  id_recurso_apu: sr.id_recurso_apu,
+                  recurso_id: sr.recurso_id || '',
+                  codigo_recurso: sr.codigo_recurso || '',
+                  descripcion: sr.descripcion,
+                  tipo_recurso: sr.tipo_recurso,
+                  unidad_medida: sr.unidad_medida,
+                  id_precio_recurso: sr.id_precio_recurso,
+                  precio: sr.precio || 0,
+                  cuadrilla: sr.cuadrilla,
+                  cantidad: sr.cantidad,
+                  desperdicio_porcentaje: sr.desperdicio_porcentaje || 0,
+                  parcial: 0, // Se calculará después
+                  orden: sr.orden,
+                  enEdicion: false,
+                  esNuevo: false,
+                  esSubpartida: false,
+                  tiene_precio_override: sr.tiene_precio_override || false,
+                  precio_override: sr.precio_override,
+                };
 
-                  // Calcular parcial después de crear el objeto completo
-                  recursoSub.parcial = calcularParcial(recursoSub);
-                  return recursoSub;
-                });
+                // Calcular parcial después de crear el objeto completo
+                recursoSub.parcial = calcularParcial(recursoSub);
+                return recursoSub;
+              });
 
-                recursoBase.recursosSubpartida = recursosSubpartida;
-                recursoBase.rendimientoSubpartida = subpartidaApu.rendimiento || 1.0;
-                recursoBase.jornadaSubpartida = subpartidaApu.jornada || 8;
+              recursoBase.recursosSubpartida = recursosSubpartida;
+              recursoBase.rendimientoSubpartida = subpartidaApu.rendimiento || 1.0;
+              recursoBase.jornadaSubpartida = subpartidaApu.jornada || 8;
 
-                // Obtener la partida subpartida para obtener su id_partida_padre (que es el id_partida_original)
-                // Si tenemos apusCalculados, buscar la partida en la estructura calculada
-                let partidaSubpartida: any = null;
-                
-                // Buscar en estructura calculada si está disponible (se pasa desde EstructuraPresupuestoEditor)
-                // Por ahora, intentar obtener desde el backend si es necesario
-                try {
-                  const partidaSubpartidaResponse = await executeQuery<{ getPartida: any }>(
-                    GET_PARTIDA_QUERY,
-                    { id_partida: r.id_partida_subpartida }
-                  );
+              // Obtener la partida subpartida para obtener su id_partida_padre (que es el id_partida_original)
+              // Si tenemos apusCalculados, buscar la partida en la estructura calculada
+              let partidaSubpartida: any = null;
 
-                  if (partidaSubpartidaResponse?.getPartida) {
-                    partidaSubpartida = partidaSubpartidaResponse.getPartida;
-                  }
-                } catch (error) {
-                  // Si hay error, continuar sin partidaSubpartida
+              // Buscar en estructura calculada si está disponible (se pasa desde EstructuraPresupuestoEditor)
+              // Por ahora, intentar obtener desde el backend si es necesario
+              try {
+                const partidaSubpartidaResponse = await executeQuery<{ getPartida: any }>(
+                  GET_PARTIDA_QUERY,
+                  { id_partida: r.id_partida_subpartida }
+                );
+
+                if (partidaSubpartidaResponse?.getPartida) {
+                  partidaSubpartida = partidaSubpartidaResponse.getPartida;
                 }
-                
-                if (partidaSubpartida) {
-                  // El id_partida_original es el id_partida_padre de la partida subpartida
-                  recursoBase.id_partida_original = partidaSubpartida.id_partida_padre || id_partida || undefined;
-                  // Usar la descripción de la partida subpartida (que es la descripción editada guardada)
-                  if (partidaSubpartida.descripcion) {
-                    recursoBase.descripcion = partidaSubpartida.descripcion;
-                  }
-                } else {
-                  // Si no se encuentra, usar el id_partida actual como referencia
-                  recursoBase.id_partida_original = id_partida || undefined;
+              } catch (error) {
+                // Si hay error, continuar sin partidaSubpartida
+              }
+
+              if (partidaSubpartida) {
+                // El id_partida_original es el id_partida_padre de la partida subpartida
+                recursoBase.id_partida_original = partidaSubpartida.id_partida_padre || id_partida || undefined;
+                // Usar la descripción de la partida subpartida (que es la descripción editada guardada)
+                if (partidaSubpartida.descripcion) {
+                  recursoBase.descripcion = partidaSubpartida.descripcion;
                 }
+              } else {
+                // Si no se encuentra, usar el id_partida actual como referencia
+                recursoBase.id_partida_original = id_partida || undefined;
+              }
             }
           }
 
@@ -443,7 +443,7 @@ export default function DetallePartidaPanel({
         });
 
         let recursosEditable = await Promise.all(recursosEditablePromises);
-        
+
         // Calcular suma de HH ANTES de establecer en el estado (para recursos con %mo)
         // Esto evita que se muestre el precio incorrecto (0.01) antes de que el useEffect lo actualice
         const calcularSumaHHDesdeRecursos = (recursos: RecursoAPUEditable[]): number => {
@@ -579,10 +579,10 @@ export default function DetallePartidaPanel({
       setHasChanges(false);
     }
   }, [
-    apuData, 
+    apuData,
     apuCalculado, // Incluir apuCalculado en dependencias para que se actualice cuando cambie
     apusCalculados, // Incluir apusCalculados para que se actualicen las subpartidas cuando cambien
-    id_partida, 
+    id_partida,
     isLoadingApu
   ]);
 
@@ -764,7 +764,7 @@ export default function DetallePartidaPanel({
     try {
       const response = await executeQuery<{ listRecursosPaginated: any }>(
         LIST_RECURSOS_PAGINATED_QUERY,
-        { 
+        {
           input: {
             page: 1,
             itemsPage: query ? 20 : 7, // Si no hay query, solo traer 7 para resultados iniciales
@@ -772,13 +772,13 @@ export default function DetallePartidaPanel({
           }
         }
       );
-      
+
       if (response?.listRecursosPaginated?.recursos) {
         // Guardar recursos completos en el ref
         response.listRecursosPaginated.recursos.forEach((r: Recurso) => {
           recursosCompletosRef.current.set(r.id, r);
         });
-        
+
         return response.listRecursosPaginated.recursos.map((r: Recurso): SearchItem => ({
           id: r.id,
           nombre: r.nombre,
@@ -874,6 +874,9 @@ export default function DetallePartidaPanel({
   const handleUpdateRecurso = (recursoId: string, campo: keyof RecursoAPUEditable, valor: string | number | boolean | null | undefined) => {
     setRecursosEditables(prev => {
       // Primero aplicar el cambio al recurso
+      let recursoIdParaSincronizar: string | null = null;
+      let nuevoPrecioParaSincronizar: number | null = null;
+
       const recursosActualizados = prev.map(r => {
         if (r.id_recurso_apu === recursoId) {
           const numValor = typeof valor === 'string' ? parseFloat(valor) || 0 : (typeof valor === 'number' ? valor : 0);
@@ -916,6 +919,11 @@ export default function DetallePartidaPanel({
               nuevoRecurso.cuadrilla = calcularCuadrillaDesdeCantidad(nuevoRecurso.cantidad);
             } else if (campo === 'precio') {
               nuevoRecurso.precio = roundToTwo(numValor);
+              // Marcar para sincronización si no tiene override
+              if (!nuevoRecurso.tiene_precio_override && nuevoRecurso.recurso_id) {
+                recursoIdParaSincronizar = nuevoRecurso.recurso_id;
+                nuevoPrecioParaSincronizar = nuevoRecurso.precio;
+              }
             } else if (campo === 'desperdicio_porcentaje') {
               nuevoRecurso.desperdicio_porcentaje = truncateToFour(numValor);
             } else {
@@ -943,6 +951,10 @@ export default function DetallePartidaPanel({
               // Si tiene override activado, actualizar también precio_override
               if (nuevoRecurso.tiene_precio_override) {
                 nuevoRecurso.precio_override = roundToTwo(numValor);
+              } else if (nuevoRecurso.recurso_id) {
+                // Marcar para sincronización si no tiene override
+                recursoIdParaSincronizar = nuevoRecurso.recurso_id;
+                nuevoPrecioParaSincronizar = nuevoRecurso.precio;
               }
             } else if (campo === 'desperdicio_porcentaje') {
               nuevoRecurso.desperdicio_porcentaje = truncateToFour(numValor);
@@ -966,6 +978,10 @@ export default function DetallePartidaPanel({
               // Si tiene override activado, actualizar también precio_override
               if (nuevoRecurso.tiene_precio_override) {
                 nuevoRecurso.precio_override = roundToTwo(numValor);
+              } else if (nuevoRecurso.recurso_id) {
+                // Marcar para sincronización si no tiene override
+                recursoIdParaSincronizar = nuevoRecurso.recurso_id;
+                nuevoPrecioParaSincronizar = nuevoRecurso.precio;
               }
             } else if (campo === 'cuadrilla') {
               nuevoRecurso.cuadrilla = truncateToFour(numValor);
@@ -982,9 +998,107 @@ export default function DetallePartidaPanel({
         return r;
       });
 
+      // SINCRONIZACIÓN LOCAL DE PRECIOS
+      // Si se modificó un precio y el recurso no tiene override, sincronizar con todos los recursos iguales
+      let recursosConSincronizacion = recursosActualizados;
+      if (recursoIdParaSincronizar && nuevoPrecioParaSincronizar !== null && campo === 'precio') {
+        recursosConSincronizacion = recursosActualizados.map(r => {
+          // Sincronizar en la partida principal
+          if (
+            r.recurso_id === recursoIdParaSincronizar &&
+            r.id_recurso_apu !== recursoId && // No actualizar el que ya se modificó
+            !r.tiene_precio_override && // Excluir recursos con override
+            !r.esSubpartida && // No es una subpartida (los recursos dentro sí se sincronizan)
+            r.unidad_medida?.toLowerCase() !== '%mo' // Excluir recursos con %mo (precio calculado)
+          ) {
+            return {
+              ...r,
+              precio: nuevoPrecioParaSincronizar as number
+            };
+          }
+
+          // Sincronizar dentro de subpartidas
+          if (r.esSubpartida && r.recursosSubpartida && r.recursosSubpartida.length > 0) {
+            const recursosSubpartidaActualizados = r.recursosSubpartida.map(sr => {
+              if (
+                sr.recurso_id === recursoIdParaSincronizar &&
+                !sr.tiene_precio_override &&
+                sr.unidad_medida?.toLowerCase() !== '%mo'
+              ) {
+                return {
+                  ...sr,
+                  precio: nuevoPrecioParaSincronizar as number
+                };
+              }
+              return sr;
+            });
+
+            // Si se actualizaron recursos dentro de la subpartida, recalcular precio unitario
+            const huboActualizacion = recursosSubpartidaActualizados.some((sr, idx) =>
+              sr.precio !== r.recursosSubpartida![idx].precio
+            );
+
+            if (huboActualizacion) {
+              // Recalcular parciales de recursos dentro de la subpartida
+              const recursosConParciales = recursosSubpartidaActualizados.map(sr => {
+                const rendimientoSub = r.rendimientoSubpartida || 1.0;
+                const jornadaSub = r.jornadaSubpartida || 8;
+
+                let parcialCalculado = 0;
+                const { tipo_recurso, cantidad, precio, cuadrilla, desperdicio_porcentaje, unidad_medida } = sr;
+                const unidadLower = unidad_medida?.toLowerCase() || '';
+
+                if (unidadLower === '%mo') {
+                  // Para %mo, calcular suma de HH
+                  const sumaHH = recursosSubpartidaActualizados
+                    .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
+                    .reduce((suma, r) => {
+                      if (rendimientoSub > 0 && jornadaSub > 0) {
+                        const cuadrillaValue = r.cuadrilla || 1;
+                        return suma + ((1 / rendimientoSub) * jornadaSub * cuadrillaValue * (r.precio || 0));
+                      }
+                      return suma;
+                    }, 0);
+                  parcialCalculado = roundToTwo(sumaHH * (cantidad / 100));
+                } else if (tipo_recurso === 'MATERIAL') {
+                  const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
+                  parcialCalculado = roundToTwo(cantidadConDesperdicio * (precio || 0));
+                } else if (tipo_recurso === 'MANO_OBRA' || (tipo_recurso === 'EQUIPO' && (unidadLower === 'hh' || unidadLower === 'hm'))) {
+                  if (rendimientoSub > 0 && jornadaSub > 0) {
+                    const cuadrillaValue = cuadrilla || 1;
+                    parcialCalculado = roundToTwo((1 / rendimientoSub) * jornadaSub * cuadrillaValue * (precio || 0));
+                  }
+                } else {
+                  parcialCalculado = roundToTwo(cantidad * (precio || 0));
+                }
+
+                return {
+                  ...sr,
+                  parcial: parcialCalculado
+                };
+              });
+
+              // Recalcular precio unitario de la subpartida
+              const costoDirectoSubpartida = recursosConParciales.reduce((suma, sr) => suma + (sr.parcial || 0), 0);
+              const nuevoPrecioUnitarioSub = roundToTwo(costoDirectoSubpartida);
+
+              return {
+                ...r,
+                recursosSubpartida: recursosConParciales,
+                precio_unitario_subpartida: nuevoPrecioUnitarioSub,
+                precio: roundToTwo(r.cantidad * nuevoPrecioUnitarioSub),
+                parcial: roundToTwo(r.cantidad * nuevoPrecioUnitarioSub)
+              };
+            }
+          }
+
+          return r;
+        });
+      }
+
       // DESPUÉS de aplicar los cambios, calcular suma de parciales de recursos con unidad "hh"
       // para actualizar precio de equipos con unidad "%mo"
-      const sumaHHManoObra = recursosActualizados
+      const sumaHHManoObra = recursosConSincronizacion
         .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
         .reduce((suma, r) => {
           if (!rendimiento || rendimiento <= 0) return suma;
@@ -996,7 +1110,7 @@ export default function DetallePartidaPanel({
 
       // Actualizar precios de recursos con unidad "%mo" y recalcular parciales
       // Para recursos con %mo, necesitamos calcular el parcial usando la suma de HH actualizada
-      return recursosActualizados.map(r => {
+      return recursosConSincronizacion.map(r => {
         // Si tiene unidad "%mo", actualizar precio automáticamente y recalcular parcial
         if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
           const precioActualizado = roundToTwo(sumaHHManoObra);
@@ -1009,8 +1123,8 @@ export default function DetallePartidaPanel({
           };
         }
         // Para otros recursos, recalcular parcial usando calcularParcial
-        // Pero para recursos con unidad "hh" que pueden afectar a %mo, necesitamos usar recursosActualizados
-        // Crear una función temporal que use recursosActualizados en lugar de recursosEditables
+        // Pero para recursos con unidad "hh" que pueden afectar a %mo, necesitamos usar recursosConSincronizacion
+        // Crear una función temporal que use recursosConSincronizacion en lugar de recursosEditables
         const calcularParcialConRecursosActualizados = (recurso: RecursoAPUEditable): number => {
           // Si es una subpartida, el parcial es cantidad × precio_unitario_subpartida
           if (recurso.esSubpartida && recurso.precio_unitario_subpartida !== undefined) {
@@ -1085,7 +1199,7 @@ export default function DetallePartidaPanel({
       setRecursosEditables(prev => {
         // Verificar si hay recursos con %mo que necesitan actualización
         const tieneRecursosPorcentajeMo = prev.some(r => r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo');
-        
+
         if (!tieneRecursosPorcentajeMo && prev.every(r => {
           const unidadMedidaLower = r.unidad_medida?.toLowerCase() || '';
           const debeSincronizarCuadrilla = (r.tipo_recurso === 'MANO_OBRA' && unidadMedidaLower === 'hh') ||
@@ -1136,7 +1250,7 @@ export default function DetallePartidaPanel({
     // Se eliminará realmente cuando se pulse "Guardar Cambios"
     setRecursosEditables(prev => {
       const recursosActualizados = prev.filter(r => r.id_recurso_apu !== recursoId);
-      
+
       // Si el recurso eliminado tenía unidad "hh", recalcular recursos con "%mo"
       if (unidadMedidaEliminado === 'hh') {
         // Calcular nueva suma de HH después de eliminar
@@ -1149,7 +1263,7 @@ export default function DetallePartidaPanel({
             const parcialMO = (1 / rendimiento) * jornada * cuadrillaValue * (r.precio || 0);
             return suma + parcialMO;
           }, 0);
-        
+
         // Actualizar precio y parcial de recursos con "%mo"
         return recursosActualizados.map(r => {
           if (r.unidad_medida === '%mo' || r.unidad_medida?.toLowerCase() === '%mo') {
@@ -1164,7 +1278,7 @@ export default function DetallePartidaPanel({
           return r;
         });
       }
-      
+
       return recursosActualizados;
     });
 
@@ -1190,14 +1304,14 @@ export default function DetallePartidaPanel({
     setCuadrillaInputs({});
     setPrecioInputs({});
     setHasChanges(false);
-    
+
     // Restaurar metrado y unidad_medida si hay cambios pendientes
     if (hasPartidaChanges && partida) {
       setMetradoInput(String(partida.metrado));
       setUnidadMedidaInput(partida.unidad_medida);
       setHasPartidaChanges(false);
     }
-    
+
     toast.success('Cambios cancelados');
   };
 
@@ -1409,6 +1523,97 @@ export default function DetallePartidaPanel({
             return r;
           });
 
+          // SINCRONIZACIÓN DE PRECIOS: Detectar cambios de precio y sincronizar
+          // Comparar precios ANTES y DESPUÉS para detectar cuáles cambiaron
+          const preciosCambiados = new Map<string, { precioAnterior: number | null, precioNuevo: number }>();
+
+          // Encontrar la subpartida que se está actualizando en los recursos anteriores
+          const subpartidaAnterior = prev.find(
+            r => r.esSubpartida && r.id_partida_subpartida === subPartidaParaActualizar.id_partida
+          );
+
+          if (subpartidaAnterior && subpartidaAnterior.recursosSubpartida) {
+            // Comparar cada recurso nuevo con el anterior
+            (subPartidaParaActualizar.recursos || []).forEach((recursoNuevo: RecursoAPUEditable) => {
+              if (!recursoNuevo.recurso_id || recursoNuevo.tiene_precio_override || recursoNuevo.unidad_medida?.toLowerCase() === '%mo') {
+                return; // Ignorar recursos sin ID, con override o %mo
+              }
+
+              const recursoAnterior = subpartidaAnterior.recursosSubpartida?.find(
+                r => r.recurso_id === recursoNuevo.recurso_id
+              );
+
+              const precioAnterior = recursoAnterior?.precio ?? null;
+              const precioNuevo = recursoNuevo.precio;
+
+              // Si el precio cambió (o es un recurso nuevo con precio), marcarlo para sincronización
+              if (precioAnterior !== precioNuevo && precioNuevo !== null && precioNuevo !== undefined) {
+                preciosCambiados.set(recursoNuevo.recurso_id, { precioAnterior, precioNuevo });
+              }
+            });
+          }
+
+          // Si hay precios que cambiaron, sincronizarlos a todos los recursos
+          if (preciosCambiados.size > 0) {
+            console.log('[DetallePartidaPanel] 🔄 Sincronizando precios desde subpartida:', Array.from(preciosCambiados.entries()));
+
+            return nuevosRecursos.map(r => {
+              // Para recursos principales
+              if (!r.esSubpartida && r.recurso_id && preciosCambiados.has(r.recurso_id)) {
+                const cambio = preciosCambiados.get(r.recurso_id)!;
+                if (!r.tiene_precio_override && r.unidad_medida?.toLowerCase() !== '%mo') {
+                  return {
+                    ...r,
+                    precio: cambio.precioNuevo
+                  };
+                }
+              }
+
+              // Para recursos dentro de otras subpartidas
+              if (r.esSubpartida && r.recursosSubpartida) {
+                const recursosSubpartidaSincronizados = r.recursosSubpartida.map(subr => {
+                  if (subr.recurso_id && preciosCambiados.has(subr.recurso_id)) {
+                    const cambio = preciosCambiados.get(subr.recurso_id)!;
+                    if (!subr.tiene_precio_override && subr.unidad_medida?.toLowerCase() !== '%mo') {
+                      return {
+                        ...subr,
+                        precio: cambio.precioNuevo
+                      };
+                    }
+                  }
+                  return subr;
+                });
+
+                // Si hubo cambios, recalcular precio unitario de la subpartida
+                const huboCambios = recursosSubpartidaSincronizados.some((subr, idx) =>
+                  subr.precio !== r.recursosSubpartida![idx].precio
+                );
+
+                if (huboCambios) {
+                  // Recalcular parciales con los nuevos precios
+                  const recursosRecalculados = recursosSubpartidaSincronizados.map(subr => ({
+                    ...subr,
+                    parcial: calcularParcial(subr)
+                  }));
+
+                  // Recalcular precio_unitario_subpartida
+                  const costoDirectoSubpartida = recursosRecalculados.reduce((suma, subr) => suma + (subr.parcial || 0), 0);
+                  const nuevoPrecioUnitario = Math.round(costoDirectoSubpartida * 100) / 100;
+
+                  return {
+                    ...r,
+                    recursosSubpartida: recursosRecalculados,
+                    precio_unitario_subpartida: nuevoPrecioUnitario,
+                    precio: Math.round(r.cantidad * nuevoPrecioUnitario * 100) / 100,
+                    parcial: roundToTwo(r.cantidad * nuevoPrecioUnitario)
+                  };
+                }
+              }
+
+              return r;
+            });
+          }
+
           return nuevosRecursos;
         });
 
@@ -1479,7 +1684,7 @@ export default function DetallePartidaPanel({
     // Verificar si hay cambios en recursos o en partida (metrado/unidad)
     const hayCambiosRecursos = hasChanges;
     const hayCambiosPartida = hasPartidaChanges;
-    
+
     if (!hayCambiosRecursos && !hayCambiosPartida) {
       toast('No hay cambios para guardar', { icon: 'ℹ️' });
       return;
@@ -1956,11 +2161,11 @@ export default function DetallePartidaPanel({
         // Esto es importante porque el usuario puede haber escrito un valor que aún no se ha actualizado en el estado
         const rendimientoActual = rendimientoInput ? parseFloat(rendimientoInput) : (rendimiento || 1.0);
         const jornadaActual = jornadaInput ? parseFloat(jornadaInput) : (jornada || 8);
-        
+
         // Validar que los valores sean números válidos
         const rendimientoFinal = isNaN(rendimientoActual) || rendimientoActual <= 0 ? 1.0 : truncateToFour(rendimientoActual);
         const jornadaFinal = isNaN(jornadaActual) || jornadaActual <= 0 ? 8 : truncateToFour(jornadaActual);
-        
+
         await executeMutation<{ updateApu: any }>(
           UPDATE_APU_MUTATION,
           {
@@ -1979,14 +2184,14 @@ export default function DetallePartidaPanel({
         const recursoCambio = (editable: RecursoAPUEditable, existente: any): boolean => {
           if (!existente) return true;
           const tolerancia = 0.0001;
-          
+
           // Verificar si cambió el id_partida_subpartida (especialmente de temp_id a id_real)
           const idSubpartidaCambio = Boolean(
-            editable.esSubpartida === true && 
+            editable.esSubpartida === true &&
             editable.id_partida_subpartida !== undefined &&
             editable.id_partida_subpartida !== existente.id_partida_subpartida
           );
-          
+
           return (
             idSubpartidaCambio ||
             Math.abs((editable.cantidad || 0) - (existente.cantidad || 0)) > tolerancia ||
@@ -2321,16 +2526,16 @@ export default function DetallePartidaPanel({
         // Invalidar query para que React Query refetch automáticamente
         // El hook useEstructuraPresupuesto recalculará todo con los precios compartidos actualizados
         queryClient.invalidateQueries({ queryKey: ['estructura-presupuesto', id_presupuesto] });
-        
+
         // Esperar un momento para que React Query procese la invalidación
         // y luego hacer refetch explícito para obtener los valores calculados por el hook
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         // Refetch usando fetchQuery que respeta el hook y sus cálculos
         const estructuraCalculada = await queryClient.fetchQuery<import('@/hooks/usePresupuestos').EstructuraPresupuesto | null>({
           queryKey: ['estructura-presupuesto', id_presupuesto],
         });
-        
+
         // El hook ya calculó parcial_presupuesto, monto_igv, monto_utilidad y total_presupuesto
         // Solo tomamos esos valores que ya están calculados
         if (estructuraCalculada?.presupuesto) {
@@ -2446,7 +2651,7 @@ export default function DetallePartidaPanel({
             <div className="flex items-center flex-1 min-w-0">
               <span className="text-[var(--text-secondary)] flex-shrink-0">Partida:</span>
               {hasPartida ? (
-                <span 
+                <span
                   className="text-xs text-[var(--text-primary)] px-1 ml-1 flex-1 min-w-0 truncate"
                   title={partida!.descripcion}
                 >
@@ -2563,14 +2768,14 @@ export default function DetallePartidaPanel({
                   value={rendimientoInput}
                   onChange={(e) => {
                     let value = e.target.value;
-                    
+
                     // Validar que no tenga más de 4 decimales
                     const decimalMatch = value.match(/\.(\d*)/);
                     if (decimalMatch && decimalMatch[1].length > 4) {
                       const parts = value.split('.');
                       value = parts[0] + '.' + parts[1].substring(0, 4);
                     }
-                    
+
                     setRendimientoInput(value);
                     if (value === '' || value === '-' || value === '.') {
                       return;
@@ -2626,14 +2831,14 @@ export default function DetallePartidaPanel({
                   value={jornadaInput}
                   onChange={(e) => {
                     let value = e.target.value;
-                    
+
                     // Validar que no tenga más de 4 decimales
                     const decimalMatch = value.match(/\.(\d*)/);
                     if (decimalMatch && decimalMatch[1].length > 4) {
                       const parts = value.split('.');
                       value = parts[0] + '.' + parts[1].substring(0, 4);
                     }
-                    
+
                     setJornadaInput(value);
                     if (value === '' || value === '-' || value === '.') {
                       return;
@@ -2882,8 +3087,8 @@ export default function DetallePartidaPanel({
                               type="number"
                               step="any"
                               min="0"
-                              value={cuadrillaInputs[recurso.id_recurso_apu] !== undefined 
-                                ? cuadrillaInputs[recurso.id_recurso_apu] 
+                              value={cuadrillaInputs[recurso.id_recurso_apu] !== undefined
+                                ? cuadrillaInputs[recurso.id_recurso_apu]
                                 : (recurso.cuadrilla === 0 ? '' : (recurso.cuadrilla !== undefined && recurso.cuadrilla !== null ? String(truncateToFour(recurso.cuadrilla)) : ''))}
                               onFocus={(e) => {
                                 if (cuadrillaInputs[recurso.id_recurso_apu] === undefined) {
@@ -2896,23 +3101,23 @@ export default function DetallePartidaPanel({
                               }}
                               onChange={(e) => {
                                 let value = e.target.value;
-                                
+
                                 // Validar que no tenga más de 4 decimales
                                 const decimalMatch = value.match(/\.(\d*)/);
                                 if (decimalMatch && decimalMatch[1].length > 4) {
                                   const parts = value.split('.');
                                   value = parts[0] + '.' + parts[1].substring(0, 4);
                                 }
-                                
+
                                 setCuadrillaInputs(prev => ({
                                   ...prev,
                                   [recurso.id_recurso_apu]: value
                                 }));
-                                
+
                                 if (value === '' || value === '-' || value === '.') {
                                   return;
                                 }
-                                
+
                                 const numValue = parseFloat(value);
                                 if (!isNaN(numValue) && numValue >= 0) {
                                   handleUpdateRecurso(recurso.id_recurso_apu, 'cuadrilla', truncateToFour(numValue));
@@ -2970,8 +3175,8 @@ export default function DetallePartidaPanel({
                                   type="number"
                                   step="any"
                                   min="0"
-                                  value={cantidadInputs[recurso.id_recurso_apu] !== undefined 
-                                    ? cantidadInputs[recurso.id_recurso_apu] 
+                                  value={cantidadInputs[recurso.id_recurso_apu] !== undefined
+                                    ? cantidadInputs[recurso.id_recurso_apu]
                                     : (recurso.cantidad === 0 ? '' : (recurso.cantidad !== undefined && recurso.cantidad !== null ? String(truncateToFour(recurso.cantidad)) : ''))}
                                   onFocus={(e) => {
                                     // Si no hay valor en el estado local, inicializarlo
@@ -2985,7 +3190,7 @@ export default function DetallePartidaPanel({
                                   }}
                                   onChange={(e) => {
                                     let value = e.target.value;
-                                    
+
                                     // Validar que no tenga más de 4 decimales
                                     const decimalMatch = value.match(/\.(\d*)/);
                                     if (decimalMatch && decimalMatch[1].length > 4) {
@@ -2993,18 +3198,18 @@ export default function DetallePartidaPanel({
                                       const parts = value.split('.');
                                       value = parts[0] + '.' + parts[1].substring(0, 4);
                                     }
-                                    
+
                                     // Actualizar el estado local inmediatamente para permitir escribir valores como "0.05"
                                     setCantidadInputs(prev => ({
                                       ...prev,
                                       [recurso.id_recurso_apu]: value
                                     }));
-                                    
+
                                     // Si el valor está vacío o es solo un punto, no actualizar el recurso aún
                                     if (value === '' || value === '-' || value === '.') {
                                       return;
                                     }
-                                    
+
                                     const numValue = parseFloat(value);
                                     // Solo actualizar el recurso si el valor es un número válido
                                     if (!isNaN(numValue) && numValue >= 0) {
@@ -3090,8 +3295,8 @@ export default function DetallePartidaPanel({
                                 type="number"
                                 step="any"
                                 min="0"
-                                value={precioInputs[recurso.id_recurso_apu] !== undefined 
-                                  ? precioInputs[recurso.id_recurso_apu] 
+                                value={precioInputs[recurso.id_recurso_apu] !== undefined
+                                  ? precioInputs[recurso.id_recurso_apu]
                                   : (recurso.precio === 0 ? '' : (recurso.precio !== undefined && recurso.precio !== null ? String(roundToTwo(recurso.precio)) : ''))}
                                 onFocus={(e) => {
                                   if (precioInputs[recurso.id_recurso_apu] === undefined) {
@@ -3104,23 +3309,23 @@ export default function DetallePartidaPanel({
                                 }}
                                 onChange={(e) => {
                                   let value = e.target.value;
-                                  
+
                                   // Validar que no tenga más de 2 decimales
                                   const decimalMatch = value.match(/\.(\d*)/);
                                   if (decimalMatch && decimalMatch[1].length > 2) {
                                     const parts = value.split('.');
                                     value = parts[0] + '.' + parts[1].substring(0, 2);
                                   }
-                                  
+
                                   setPrecioInputs(prev => ({
                                     ...prev,
                                     [recurso.id_recurso_apu]: value
                                   }));
-                                  
+
                                   if (value === '' || value === '-' || value === '.') {
                                     return;
                                   }
-                                  
+
                                   const numValue = parseFloat(value);
                                   if (!isNaN(numValue) && numValue >= 0) {
                                     const roundedValue = roundToTwo(numValue);
