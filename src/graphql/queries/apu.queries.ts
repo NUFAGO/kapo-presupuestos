@@ -3,8 +3,8 @@
  */
 
 export const GET_APU_BY_PARTIDA_QUERY = `
-  query GetApuByPartida($id_partida: String!) {
-    getApuByPartida(id_partida: $id_partida) {
+  query GetApuByPartida($id_partida: String!, $id_presupuesto: String!) {
+    getApuByPartida(id_partida: $id_partida, id_presupuesto: $id_presupuesto) {
       _id
       id_apu
       id_partida

@@ -41,6 +41,7 @@ export interface PartidaInput {
 
 export interface PartidaUpdateInput {
   id_partida: string;
+  id_presupuesto: string;
   id_titulo?: string;
   id_partida_padre?: string | null;
   nivel_partida?: number;
@@ -113,17 +114,18 @@ export function useDeletePartida() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id_partida: string) => {
+    mutationFn: async ({ id_partida, id_presupuesto }: { id_partida: string; id_presupuesto: string }) => {
       const response = await executeMutation<{ deletePartida: Partida | null }>(
         DELETE_PARTIDA_MUTATION,
-        { id_partida }
+        { id_partida, id_presupuesto }
       );
       // Si el backend devuelve null, significa que se eliminó correctamente
       // o que no existía. En cualquier caso, consideramos éxito
-      return id_partida;
+      return { id_partida, id_presupuesto };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['estructura-presupuesto'] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['estructura-presupuesto', data.id_presupuesto] });
+      queryClient.invalidateQueries({ queryKey: ['partidas', 'presupuesto', data.id_presupuesto] });
       queryClient.invalidateQueries({ queryKey: ['partidas'] });
       toast.success('Partida eliminada exitosamente');
     },

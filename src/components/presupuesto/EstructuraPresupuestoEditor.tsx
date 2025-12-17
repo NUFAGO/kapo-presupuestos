@@ -2224,7 +2224,7 @@ export default function EstructuraPresupuestoEditor({
           const numeroItemCalculado = calcularNumeroItem(partida, 'PARTIDA');
           const esAfectado = itemsAfectados.has(partida.id_partida);
 
-          const cambios: any = { id_partida: partida.id_partida };
+          const cambios: any = { id_partida: partida.id_partida, id_presupuesto: partida.id_presupuesto };
           if (partida.descripcion !== original.descripcion) cambios.descripcion = partida.descripcion;
           if (partida.id_titulo !== original.id_titulo) cambios.id_titulo = partida.id_titulo;
           if (partida.id_partida_padre !== original.id_partida_padre) cambios.id_partida_padre = partida.id_partida_padre;

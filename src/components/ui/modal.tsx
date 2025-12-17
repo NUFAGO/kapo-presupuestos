@@ -102,8 +102,13 @@ export default function Modal({
             transform: isAnimating ? 'translateY(0) scale(1)' : 'translateY(-20px) scale(0.98)',
             display: 'flex',
             flexDirection: 'column',
-            maxHeight: '91vh',
-            height: '91vh',
+            // Solo aplicar altura fija para modales grandes (xl y full)
+            ...(size === 'xl' || size === 'full' ? {
+              maxHeight: '91vh',
+              height: '91vh',
+            } : {
+              maxHeight: '91vh',
+            }),
           }}
           onClick={(e) => e.stopPropagation()}
         >

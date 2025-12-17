@@ -27,8 +27,8 @@ import { LIST_RECURSOS_PAGINATED_QUERY } from '@/graphql/queries/recurso.queries
 import { GET_ESTRUCTURA_PRESUPUESTO_QUERY } from '@/graphql/queries/presupuesto.queries';
 
 const GET_PARTIDA_QUERY = `
-  query GetPartida($id_partida: String!) {
-    getPartida(id_partida: $id_partida) {
+  query GetPartida($id_partida: String!, $id_presupuesto: String!) {
+    getPartida(id_partida: $id_partida, id_presupuesto: $id_presupuesto) {
       id_partida
       id_partida_padre
       id_titulo
@@ -161,9 +161,10 @@ export default function DetallePartidaPanel({
 
   const queryClient = useQueryClient();
   // Solo hacer query al backend si NO tenemos apuCalculado y NO es partida nueva
-  const shouldFetchFromBackend = !apuCalculado && !esPartidaNoGuardada && !!id_partida;
+  const shouldFetchFromBackend = !apuCalculado && !esPartidaNoGuardada && !!id_partida && !!id_presupuesto;
   const { data: apuDataBackend, isLoading: isLoadingApu, refetch: refetchApu } = useApuByPartida(
-    shouldFetchFromBackend ? id_partida : null
+    shouldFetchFromBackend ? id_partida : null,
+    shouldFetchFromBackend ? id_presupuesto : null
   );
 
   // Priorizar apuCalculado sobre apuDataBackend
@@ -357,11 +358,12 @@ export default function DetallePartidaPanel({
             }
 
             // Si no se encontró en apusCalculados, hacer query al backend
-            if (!subpartidaApu) {
+            // Usar id_presupuesto del presupuesto actual para buscar el APU de la subpartida
+            if (!subpartidaApu && id_presupuesto) {
               try {
                 const subpartidaApuResponse = await executeQuery<{ getApuByPartida: any }>(
                   GET_APU_BY_PARTIDA_QUERY,
-                  { id_partida: r.id_partida_subpartida }
+                  { id_partida: r.id_partida_subpartida, id_presupuesto }
                 );
 
                 if (subpartidaApuResponse?.getApuByPartida) {
@@ -415,7 +417,7 @@ export default function DetallePartidaPanel({
               try {
                 const partidaSubpartidaResponse = await executeQuery<{ getPartida: any }>(
                   GET_PARTIDA_QUERY,
-                  { id_partida: r.id_partida_subpartida }
+                  { id_partida: r.id_partida_subpartida, id_presupuesto }
                 );
 
                 if (partidaSubpartidaResponse?.getPartida) {
@@ -1638,6 +1640,7 @@ export default function DetallePartidaPanel({
       // El frontend calculará parcial_partida automáticamente, no es necesario enviarlo
       await updatePartida.mutateAsync({
         id_partida: id_partida,
+        id_presupuesto: id_presupuesto,
         metrado: nuevoMetrado,
       });
       setHasPartidaChanges(false);
@@ -1661,6 +1664,7 @@ export default function DetallePartidaPanel({
     try {
       await updatePartida.mutateAsync({
         id_partida: id_partida,
+        id_presupuesto: id_presupuesto,
         unidad_medida: unidadFinal,
       });
       setHasPartidaChanges(false);
@@ -1792,15 +1796,31 @@ export default function DetallePartidaPanel({
 
         if (metradoCambio || unidadCambio) {
           try {
-            await updatePartida.mutateAsync({
+            const metradoAEnviar = !isNaN(nuevoMetrado) && nuevoMetrado >= 0 ? nuevoMetrado : partida.metrado;
+            
+            const partidaActualizada = await updatePartida.mutateAsync({
               id_partida: id_partida,
-              metrado: !isNaN(nuevoMetrado) && nuevoMetrado >= 0 ? nuevoMetrado : partida.metrado,
+              id_presupuesto: id_presupuesto,
+              metrado: metradoAEnviar,
               unidad_medida: nuevaUnidad,
             });
+            
+            // Actualizar el estado local con el valor que viene del backend
+            if (partidaActualizada) {
+              setMetradoInput(String(partidaActualizada.metrado));
+              setUnidadMedidaInput(partidaActualizada.unidad_medida);
+            }
+            
             setHasPartidaChanges(false);
+            
+            // Invalidar y refetch explícitamente para asegurar que los datos se actualicen
+            await queryClient.invalidateQueries({ queryKey: ['estructura-presupuesto', id_presupuesto] });
+            await queryClient.refetchQueries({ queryKey: ['estructura-presupuesto', id_presupuesto] });
           } catch (error) {
-            console.error('Error al actualizar metrado/unidad:', error);
             toast.error('Error al actualizar la partida');
+            // Restaurar valores originales en caso de error
+            setMetradoInput(String(partida.metrado));
+            setUnidadMedidaInput(partida.unidad_medida);
             return;
           }
         }
@@ -1863,7 +1883,7 @@ export default function DetallePartidaPanel({
         try {
           const partidaResponse = await executeQuery<{ getPartida: any }>(
             GET_PARTIDA_QUERY,
-            { id_partida }
+            { id_partida, id_presupuesto }
           );
           partidaCompleta = partidaResponse?.getPartida;
         } catch (error) {
@@ -2034,10 +2054,10 @@ export default function DetallePartidaPanel({
           // Si hay cambios, actualizar el APU de la subpartida
           if (hayCambiosCantidad || hayCambiosRendimiento || hayCambiosJornada || hayCambiosRecursos) {
             try {
-              // Obtener el APU de la subpartida
+              // Obtener el APU de la subpartida (usar id_presupuesto del presupuesto actual)
               const subpartidaApuResponse = await executeQuery<{ getApuByPartida: any }>(
                 GET_APU_BY_PARTIDA_QUERY,
-                { id_partida: subpartida.id_partida_subpartida! }
+                { id_partida: subpartida.id_partida_subpartida!, id_presupuesto }
               );
 
               if (!subpartidaApuResponse?.getApuByPartida) {
@@ -2284,7 +2304,7 @@ export default function DetallePartidaPanel({
             try {
               const subpartidaApuResponse = await executeQuery<{ getApuByPartida: any }>(
                 GET_APU_BY_PARTIDA_QUERY,
-                { id_partida: recurso.id_partida_subpartida! }
+                { id_partida: recurso.id_partida_subpartida!, id_presupuesto }
               );
 
               return {
@@ -2339,6 +2359,7 @@ export default function DetallePartidaPanel({
                 DELETE_PARTIDA_MUTATION,
                 {
                   id_partida: recurso.id_partida_subpartida,
+                  id_presupuesto: id_presupuesto,
                 }
               ).catch((error) => {
                 // Si falla eliminar la partida, continuar
@@ -2443,11 +2464,11 @@ export default function DetallePartidaPanel({
           recursoBase.parcial = calcularParcial(recursoBase);
 
           // Si es subpartida, cargar su APU para obtener recursos, rendimiento y jornada
-          if (esSubpartida && r.id_partida_subpartida) {
+          if (esSubpartida && r.id_partida_subpartida && id_presupuesto) {
             try {
               const subpartidaApuResponse = await executeQuery<{ getApuByPartida: any }>(
                 GET_APU_BY_PARTIDA_QUERY,
-                { id_partida: r.id_partida_subpartida }
+                { id_partida: r.id_partida_subpartida, id_presupuesto }
               );
 
               if (subpartidaApuResponse?.getApuByPartida) {
@@ -2484,7 +2505,7 @@ export default function DetallePartidaPanel({
                 try {
                   const partidaSubpartidaResponse = await executeQuery<{ getPartida: any }>(
                     GET_PARTIDA_QUERY,
-                    { id_partida: r.id_partida_subpartida }
+                    { id_partida: r.id_partida_subpartida, id_presupuesto }
                   );
 
                   if (partidaSubpartidaResponse?.getPartida) {

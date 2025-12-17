@@ -55,6 +55,7 @@ export const CREATE_PARTIDA_MUTATION = `
 export const UPDATE_PARTIDA_MUTATION = `
   mutation UpdatePartida(
     $id_partida: String!
+    $id_presupuesto: String!
     $id_titulo: String
     $id_partida_padre: String
     $nivel_partida: Int
@@ -69,6 +70,7 @@ export const UPDATE_PARTIDA_MUTATION = `
   ) {
     updatePartida(
       id_partida: $id_partida
+      id_presupuesto: $id_presupuesto
       id_titulo: $id_titulo
       id_partida_padre: $id_partida_padre
       nivel_partida: $nivel_partida
@@ -101,8 +103,8 @@ export const UPDATE_PARTIDA_MUTATION = `
 `;
 
 export const DELETE_PARTIDA_MUTATION = `
-  mutation DeletePartida($id_partida: String!) {
-    deletePartida(id_partida: $id_partida) {
+  mutation DeletePartida($id_partida: String!, $id_presupuesto: String!) {
+    deletePartida(id_partida: $id_partida, id_presupuesto: $id_presupuesto) {
       id_partida
       descripcion
     }

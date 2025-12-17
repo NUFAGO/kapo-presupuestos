@@ -87,19 +87,20 @@ export interface UpdateApuInput {
 
 /**
  * Hook para obtener APU por partida
+ * Requiere id_presupuesto para evitar ambigüedad cuando el mismo id_partida existe en múltiples presupuestos
  */
-export function useApuByPartida(id_partida: string | null) {
+export function useApuByPartida(id_partida: string | null, id_presupuesto: string | null) {
   return useQuery({
-    queryKey: ['apu', 'partida', id_partida],
+    queryKey: ['apu', 'partida', id_partida, id_presupuesto],
     queryFn: async () => {
-      if (!id_partida) return null;
+      if (!id_partida || !id_presupuesto) return null;
       const response = await executeQuery<{ getApuByPartida: Apu | null }>(
         GET_APU_BY_PARTIDA_QUERY,
-        { id_partida }
+        { id_partida, id_presupuesto }
       );
       return response.getApuByPartida;
     },
-    enabled: !!id_partida,
+    enabled: !!id_partida && !!id_presupuesto,
     staleTime: 30000, // 30 segundos
   });
 }

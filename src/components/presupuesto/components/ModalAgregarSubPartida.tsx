@@ -108,7 +108,8 @@ export default function ModalAgregarSubPartida({
 
   // Cargar APU de la partida seleccionada
   const { data: apuData, isLoading: isLoadingApu, refetch: refetchApu } = useApuByPartida(
-    partidaSeleccionada?.id_partida || null
+    partidaSeleccionada?.id_partida || null,
+    id_presupuesto || null
   );
   const precioSync = usePrecioSync();
 
