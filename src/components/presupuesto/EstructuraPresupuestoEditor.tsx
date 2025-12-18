@@ -81,9 +81,10 @@ export default function EstructuraPresupuestoEditor({
   const [itemSeleccionado, setItemSeleccionado] = useState<string | null>(null);
   const [itemCortado, setItemCortado] = useState<string | null>(null);
 
-  // Estado para el panel redimensionable (porcentaje del panel inferior, inicialmente 30%)
-  const [panelInferiorHeight, setPanelInferiorHeight] = useState(40);
+  // Estado para el panel redimensionable (porcentaje del panel inferior, inicialmente cerrado)
+  const [panelInferiorHeight, setPanelInferiorHeight] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
+  const [panelCerrado, setPanelCerrado] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Obtener estructura del presupuesto desde el backend
@@ -560,7 +561,17 @@ export default function EstructuraPresupuestoEditor({
   };
 
   const handleSeleccionar = (id: string) => {
-    setItemSeleccionado(id === itemSeleccionado ? null : id);
+    const nuevoSeleccionado = id === itemSeleccionado ? null : id;
+    setItemSeleccionado(nuevoSeleccionado);
+    
+    // Abrir el panel si se selecciona algo (título o partida)
+    if (nuevoSeleccionado) {
+      setPanelCerrado(false);
+      // Si el panel está cerrado o tiene altura muy baja, abrirlo con un tamaño razonable
+      if (panelInferiorHeight < 10) {
+        setPanelInferiorHeight(40);
+      }
+    }
   };
 
   // Detectar si el item seleccionado es una partida
@@ -573,15 +584,21 @@ export default function EstructuraPresupuestoEditor({
     return null;
   }, [itemSeleccionado, obtenerTipoItem]);
 
+  // Función para cerrar el panel
+  const handleCerrarPanel = () => {
+    setPanelCerrado(true);
+    setPanelInferiorHeight(0);
+  };
+
   // Ajustar tamaño del panel automáticamente cuando se selecciona una partida
   useEffect(() => {
-    if (partidaSeleccionada && panelInferiorHeight < 50) {
-      setPanelInferiorHeight(50);
-    } else if (!partidaSeleccionada && panelInferiorHeight > 30) {
-      // Opcional: reducir cuando no hay partida seleccionada
-      // setPanelInferiorHeight(30);
+    if (partidaSeleccionada && !panelCerrado) {
+      // Si hay partida seleccionada y el panel no está cerrado, asegurar un tamaño mínimo
+      if (panelInferiorHeight < 10) {
+        setPanelInferiorHeight(40);
+      }
     }
-  }, [partidaSeleccionada]);
+  }, [partidaSeleccionada, panelCerrado]);
 
   // Lógica de redimensionamiento del panel (optimizada con requestAnimationFrame)
   useEffect(() => {
@@ -2895,72 +2912,77 @@ export default function EstructuraPresupuestoEditor({
           </div>
         </div>
 
-        {/* Divisor Redimensionable */}
-        <div
-          className="flex-shrink-0 h-1 bg-[var(--border-color)] hover:bg-blue-500 cursor-row-resize transition-colors relative group table-header-shadow"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            setIsResizing(true);
-          }}
-        >
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-12 h-0.5 bg-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity rounded" />
-          </div>
-        </div>
-
         {/* Panel Inferior - Detalle de Partida */}
-        <div
-          className="flex-shrink-0 min-h-0 overflow-hidden"
-          style={{ height: `${panelInferiorHeight}%` }}
-        >
-          <DetallePartidaPanel
-            id_partida={partidaSeleccionada}
-            id_presupuesto={id_presupuesto}
-            id_proyecto={id_proyecto_real}
-            partida={partidaSeleccionada ? partidas.find(p => p.id_partida === partidaSeleccionada) || null : null}
-            apuCalculado={partidaSeleccionada && estructuraData?.apus ? estructuraData.apus.find(apu => apu.id_partida === partidaSeleccionada) || null : null}
-            apusCalculados={estructuraData?.apus || null}
-            onAgregarSubPartida={() => {
-              setSubPartidaParaEditar(null);
-              setModalAgregarSubPartidaAbierto(true);
-            }}
-            onEditarSubPartida={(idPartidaSubpartida, recursos, idPartidaOriginal, rendimiento, jornada, descripcion) => {
-              // Guardar TODOS los datos de la subpartida para cargarlos en el modal
-              setSubPartidaParaEditar({
-                id: idPartidaSubpartida,
-                recursos,
-                idPartidaOriginal,
-                rendimiento,
-                jornada,
-                descripcion
-              });
-              setModalAgregarSubPartidaAbierto(true);
-            }}
-            subpartidasPendientes={subpartidasPendientes}
-            onLimpiarSubpartidasPendientes={() => {
-              setSubpartidasPendientes([]);
-            }}
-            subPartidaParaActualizar={subPartidaParaActualizar}
-            onLimpiarSubPartidaParaActualizar={() => {
-              setSubPartidaParaActualizar(null);
-            }}
-            onEliminarSubPartida={(idPartidaSubpartida) => {
-              // Eliminar la subpartida del estado de partidas
-              setPartidas(prev => prev.filter(p => p.id_partida !== idPartidaSubpartida));
+        {!panelCerrado && (
+          <>
+            {/* Divisor Redimensionable */}
+            <div
+              className="flex-shrink-0 h-1 bg-[var(--border-color)] hover:bg-blue-500 cursor-row-resize transition-colors relative group table-header-shadow"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsResizing(true);
+              }}
+            >
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-12 h-0.5 bg-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity rounded" />
+              </div>
+            </div>
 
-              // También eliminarla de las subpartidas para crear APU si existe
-              setSubpartidasParaCrearApu(prev => {
-                const newMap = new Map(prev);
-                newMap.delete(idPartidaSubpartida);
-                return newMap;
-              });
-            }}
-            onGuardandoCambios={(isGuardando) => {
-              setIsSavingRecursos(isGuardando);
-            }}
-            modo={modo as 'edicion' | 'lectura' | 'meta' | 'licitacion' | 'contractual'}
-          />
-        </div>
+            <div
+              className="flex-shrink-0 min-h-0 overflow-hidden"
+              style={{ height: `${panelInferiorHeight}%` }}
+            >
+              <DetallePartidaPanel
+                id_partida={partidaSeleccionada}
+                id_presupuesto={id_presupuesto}
+                id_proyecto={id_proyecto_real}
+                partida={partidaSeleccionada ? partidas.find(p => p.id_partida === partidaSeleccionada) || null : null}
+                apuCalculado={partidaSeleccionada && estructuraData?.apus ? estructuraData.apus.find(apu => apu.id_partida === partidaSeleccionada) || null : null}
+                apusCalculados={estructuraData?.apus || null}
+                onAgregarSubPartida={() => {
+                  setSubPartidaParaEditar(null);
+                  setModalAgregarSubPartidaAbierto(true);
+                }}
+                onEditarSubPartida={(idPartidaSubpartida, recursos, idPartidaOriginal, rendimiento, jornada, descripcion) => {
+                  // Guardar TODOS los datos de la subpartida para cargarlos en el modal
+                  setSubPartidaParaEditar({
+                    id: idPartidaSubpartida,
+                    recursos,
+                    idPartidaOriginal,
+                    rendimiento,
+                    jornada,
+                    descripcion
+                  });
+                  setModalAgregarSubPartidaAbierto(true);
+                }}
+                subpartidasPendientes={subpartidasPendientes}
+                onLimpiarSubpartidasPendientes={() => {
+                  setSubpartidasPendientes([]);
+                }}
+                subPartidaParaActualizar={subPartidaParaActualizar}
+                onLimpiarSubPartidaParaActualizar={() => {
+                  setSubPartidaParaActualizar(null);
+                }}
+                onEliminarSubPartida={(idPartidaSubpartida) => {
+                  // Eliminar la subpartida del estado de partidas
+                  setPartidas(prev => prev.filter(p => p.id_partida !== idPartidaSubpartida));
+
+                  // También eliminarla de las subpartidas para crear APU si existe
+                  setSubpartidasParaCrearApu(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(idPartidaSubpartida);
+                    return newMap;
+                  });
+                }}
+                onGuardandoCambios={(isGuardando) => {
+                  setIsSavingRecursos(isGuardando);
+                }}
+                onCerrar={handleCerrarPanel}
+                modo={modo as 'edicion' | 'lectura' | 'meta' | 'licitacion' | 'contractual'}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Modal para crear/editar título o partida */}
