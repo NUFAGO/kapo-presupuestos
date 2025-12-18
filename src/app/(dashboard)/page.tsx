@@ -1,17 +1,20 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { LoadingSpinner } from '@/components/ui';
+
 export default function DashboardPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirigir automáticamente a proyectos
+    router.replace('/proyectos');
+  }, [router]);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-[var(--text-on-content-bg-heading)]">
-          Dashboard
-        </h1>
-        <p className="text-[var(--text-on-content-bg)] mt-2">
-          Bienvenido al sistema de presupuestos
-        </p>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Aquí puedes agregar tus componentes de dashboard */}
-      </div>
+    <div className="flex items-center justify-center min-h-[400px]">
+      <LoadingSpinner size={80} showText={true} text="Redirigiendo a proyectos..." />
     </div>
   );
 }

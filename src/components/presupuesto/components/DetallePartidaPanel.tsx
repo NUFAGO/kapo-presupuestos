@@ -1634,7 +1634,7 @@ export default function DetallePartidaPanel({
   // NOTA: Ya no se llama automáticamente en onBlur, se guarda con "Guardar Cambios APU"
   // Mantenido por compatibilidad pero el flujo principal es a través de handleGuardarCambios
   const handleActualizarMetrado = async (nuevoMetrado: number) => {
-    if (!partida || !id_partida || esPartidaNoGuardada) return;
+    if (!partida || !id_partida || esPartidaNoGuardada || !id_presupuesto) return;
 
     try {
       // El frontend calculará parcial_partida automáticamente, no es necesario enviarlo
@@ -1655,7 +1655,7 @@ export default function DetallePartidaPanel({
 
   // Handler para actualizar unidad de medida de la partida
   const handleActualizarUnidadMedida = async (nuevaUnidad: string | null) => {
-    if (!partida || !id_partida || esPartidaNoGuardada) return;
+    if (!partida || !id_partida || esPartidaNoGuardada || !id_presupuesto) return;
 
     // nuevaUnidad ya viene como nombre (string) del SearchSelect
     // Permitir valores vacíos cuando el usuario borra manualmente (no forzar 'und')
@@ -1782,7 +1782,7 @@ export default function DetallePartidaPanel({
       }
 
       // Guardar metrado y unidad_medida si hay cambios pendientes
-      if (hayCambiosPartida && partida && id_partida && !esPartidaNoGuardada) {
+      if (hayCambiosPartida && partida && id_partida && !esPartidaNoGuardada && id_presupuesto) {
         // Validar que la unidad no esté vacía
         const nuevaUnidad = unidadMedidaInput?.trim() || '';
         if (!nuevaUnidad) {
@@ -2304,7 +2304,7 @@ export default function DetallePartidaPanel({
             try {
               const subpartidaApuResponse = await executeQuery<{ getApuByPartida: any }>(
                 GET_APU_BY_PARTIDA_QUERY,
-                { id_partida: recurso.id_partida_subpartida!, id_presupuesto }
+                { id_partida: recurso.id_partida_subpartida!, id_presupuesto: id_presupuesto! }
               );
 
               return {
@@ -2359,7 +2359,7 @@ export default function DetallePartidaPanel({
                 DELETE_PARTIDA_MUTATION,
                 {
                   id_partida: recurso.id_partida_subpartida,
-                  id_presupuesto: id_presupuesto,
+                  id_presupuesto: id_presupuesto!,
                 }
               ).catch((error) => {
                 // Si falla eliminar la partida, continuar

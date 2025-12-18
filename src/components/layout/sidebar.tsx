@@ -158,7 +158,7 @@ export function Sidebar() {
       >
         <Link
           className="flex h-[60px] items-center justify-center px-4 hover:opacity-90 transition-opacity duration-300"
-          href="/"
+          href="/proyectos"
         >
           <div
             className={clsx(
