@@ -10,8 +10,9 @@ import { useEstructuraPresupuesto } from '@/hooks/usePresupuestos';
 import { useApuByPartida } from '@/hooks/useAPU';
 import type { PartidaEstructura, TituloEstructura } from '@/hooks/usePresupuestos';
 import { executeQuery } from '@/services/graphql-client';
-import { GET_TRAZABILIDAD_PARTIDA_QUERY } from '@/graphql/queries/control-costos.queries';
+import { GET_TRAZABILIDAD_PARTIDA_QUERY, GET_TRAZABILIDAD_DETALLE_PARTIDA_QUERY } from '@/graphql/queries/control-costos.queries';
 import { useQuery } from '@tanstack/react-query';
+import ModalTrazabilidadDetalle from './ModalTrazabilidadDetalle';
 
 interface EstructuraCostosResumenProps {
   id_presupuesto: string;
@@ -24,6 +25,16 @@ export default function EstructuraCostosResumen({
   const router = useRouter();
   const [partidasColapsadas, setPartidasColapsadas] = useState<Set<string>>(new Set());
   const [partidaSeleccionada, setPartidaSeleccionada] = useState<PartidaEstructura | null>(null);
+  const [recursoSeleccionado, setRecursoSeleccionado] = useState<{
+    recurso_id: string;
+    codigo: string;
+    descripcion: string;
+    totalRQ: number;
+    totalOCBienes: number;
+    totalOCServicios: number;
+    totalRecepcion: number;
+    diferencia: number;
+  } | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
   const partidaRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
@@ -47,6 +58,21 @@ export default function EstructuraCostosResumen({
       return response.getTrazabilidadPartida;
     },
     enabled: !!partidaSeleccionada?.id_partida && !!id_presupuesto,
+    staleTime: 30000, // 30 segundos
+  });
+
+  // Cargar trazabilidad detallada para el modal
+  const { data: trazabilidadDetalle, isLoading: isLoadingDetalle } = useQuery({
+    queryKey: ['trazabilidadDetallePartida', partidaSeleccionada?.id_partida],
+    queryFn: async () => {
+      if (!partidaSeleccionada?.id_partida) return null;
+      const response = await executeQuery<{ getTrazabilidadDetallePartida: any }>(
+        GET_TRAZABILIDAD_DETALLE_PARTIDA_QUERY,
+        { id_partida: partidaSeleccionada.id_partida }
+      );
+      return response.getTrazabilidadDetallePartida;
+    },
+    enabled: !!partidaSeleccionada?.id_partida && !!recursoSeleccionado,
     staleTime: 30000, // 30 segundos
   });
 
@@ -224,8 +250,9 @@ export default function EstructuraCostosResumen({
       const recursoInfo = recursosApuMap.get(recurso.recurso_id);
       
       return {
-        codigo: recursoInfo?.codigo || recurso.recurso_id || '-',
-        descripcion: recursoInfo?.descripcion || recurso.recurso_id || '-',
+        recurso_id: recurso.recurso_id, // Agregar recurso_id para el modal
+        codigo: recursoInfo?.codigo || recurso.codigo_recurso || recurso.recurso_id || '-',
+        descripcion: recursoInfo?.descripcion || recurso.nombre_recurso || recurso.recurso_id || '-',
         totalRQ: recurso.total_requerimiento || 0,
         totalOCBienes: recurso.total_ordenes_compra_bienes || 0,
         totalOCServicios: recurso.total_ordenes_compra_servicios || 0,
@@ -712,104 +739,134 @@ export default function EstructuraCostosResumen({
               <h2 className="text-xs font-semibold text-[var(--text-primary)]">Costo Real + Proyección</h2>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">Análisis de ejecución vs presupuestado</p>
             </div>
-            <div className="overflow-x-auto max-h-[calc(50vh-120px)]">
-              <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
-                <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
-                  <tr>
-                    <th className="w-[60px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
-                      Código
-                    </th>
-                    <th className="w-auto px-1 py-1 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
-                      Descripción
-                    </th>
-                    <th className="w-[65px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
-                      Total RQ
-                    </th>
-                    <th className="w-[90px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
-                      Total OC Bienes
-                    </th>
-                    <th className="w-[100px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
-                      Total OC Servicios
-                    </th>
-                    <th className="w-[120px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
-                      Total Recepción Almacén
-                    </th>
-                    <th className="w-[65px] px-1 py-1 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-xs">
-                      Diferencia
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-[var(--background)] divide-y divide-[var(--border-color)]">
-                  {isLoadingTrazabilidad ? (
+            <div className="overflow-y-auto max-h-[calc(50vh-120px)]">
+              <div className="min-w-0">
+                <table className="w-full divide-y divide-[var(--border-color)] text-xs">
+                  <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
                     <tr>
-                      <td colSpan={7} className="px-1 py-4 text-center text-xs text-[var(--text-secondary)]">
-                        <LoadingSpinner size={20} showText={false} />
-                        <span className="ml-2">Cargando datos de trazabilidad...</span>
-                      </td>
+                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        Código
+                      </th>
+                      <th className="px-1.5 py-1.5 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] min-w-[120px] max-w-[200px]">
+                        Descripción
+                      </th>
+                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        RQ
+                      </th>
+                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        OC B
+                      </th>
+                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        OC S
+                      </th>
+                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        Recep.
+                      </th>
+                      <th className="px-1.5 py-1.5 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-[10px] whitespace-nowrap">
+                        Dif.
+                      </th>
                     </tr>
-                  ) : datosCostoReal.length === 0 ? (
+                  </thead>
+                  <tbody className="bg-[var(--background)] divide-y divide-[var(--border-color)]">
+                    {isLoadingTrazabilidad ? (
+                      <tr>
+                        <td colSpan={7} className="px-1.5 py-4 text-center text-xs text-[var(--text-secondary)]">
+                          <LoadingSpinner size={20} showText={false} />
+                          <span className="ml-2">Cargando datos de trazabilidad...</span>
+                        </td>
+                      </tr>
+                    ) : datosCostoReal.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-1.5 py-4 text-center text-xs text-[var(--text-secondary)]">
+                          {partidaSeleccionada 
+                            ? 'Esta partida no tiene datos de trazabilidad'
+                            : 'Seleccione una partida para ver los costos reales'}
+                        </td>
+                      </tr>
+                    ) : (
+                      datosCostoReal.map((item: any, index: number) => (
+                      <tr 
+                        key={index} 
+                        className="hover:bg-[var(--hover-bg)] transition-colors cursor-pointer"
+                        onClick={() => {
+                          setRecursoSeleccionado({
+                            recurso_id: item.recurso_id,
+                            codigo: item.codigo,
+                            descripcion: item.descripcion,
+                            totalRQ: item.totalRQ,
+                            totalOCBienes: item.totalOCBienes,
+                            totalOCServicios: item.totalOCServicios,
+                            totalRecepcion: item.totalRecepcion,
+                            diferencia: item.diferencia,
+                          });
+                        }}
+                      >
+                        <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs font-medium whitespace-nowrap">
+                          {item.codigo}
+                        </td>
+                        <td className="px-1.5 py-1.5 border-r border-[var(--border-color)] text-xs truncate max-w-[200px]" title={item.descripcion}>
+                          {item.descripcion}
+                        </td>
+                        <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                          {item.totalRQ.toFixed(2)}
+                        </td>
+                        <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                          {item.totalOCBienes.toFixed(2)}
+                        </td>
+                        <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                          {item.totalOCServicios.toFixed(2)}
+                        </td>
+                        <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                          {item.totalRecepcion.toFixed(2)}
+                        </td>
+                        <td className={`px-1.5 py-1.5 text-right text-xs whitespace-nowrap font-mono font-semibold ${item.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {item.diferencia >= 0 ? '+' : ''}{item.diferencia.toFixed(2)}
+                        </td>
+                      </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot className="bg-[var(--card-bg)] sticky bottom-0">
                     <tr>
-                      <td colSpan={7} className="px-1 py-4 text-center text-xs text-[var(--text-secondary)]">
-                        {partidaSeleccionada 
-                          ? 'Esta partida no tiene datos de trazabilidad'
-                          : 'Seleccione una partida para ver los costos reales'}
+                      <td colSpan={2} className="px-1.5 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
+                        Totales:
+                      </td>
+                      <td className="px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                        {totalesCostoReal.totalRQ.toFixed(2)}
+                      </td>
+                      <td className="px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                        {totalesCostoReal.totalOCBienes.toFixed(2)}
+                      </td>
+                      <td className="px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                        {totalesCostoReal.totalOCServicios.toFixed(2)}
+                      </td>
+                      <td className="px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                        {totalesCostoReal.totalRecepcion.toFixed(2)}
+                      </td>
+                      <td className={`px-1.5 py-2 text-right font-semibold text-xs whitespace-nowrap font-mono ${totalesCostoReal.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {totalesCostoReal.diferencia >= 0 ? '+' : ''}{totalesCostoReal.diferencia.toFixed(2)}
                       </td>
                     </tr>
-                  ) : (
-                    datosCostoReal.map((item: any, index: number) => (
-                    <tr key={index} className="hover:bg-[var(--hover-bg)] transition-colors">
-                      <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs">
-                        {item.codigo}
-                      </td>
-                      <td className="px-1 py-1 border-r border-[var(--border-color)] text-xs">
-                        {item.descripcion}
-                      </td>
-                      <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs">
-                        {item.totalRQ.toFixed(2)}
-                      </td>
-                      <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs">
-                        {item.totalOCBienes.toFixed(2)}
-                      </td>
-                      <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs">
-                        {item.totalOCServicios.toFixed(2)}
-                      </td>
-                      <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs">
-                        {item.totalRecepcion.toFixed(2)}
-                      </td>
-                      <td className={`px-1 py-1 text-right text-xs ${item.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {item.diferencia >= 0 ? '+' : ''}{item.diferencia.toFixed(2)}
-                      </td>
-                    </tr>
-                    ))
-                  )}
-                </tbody>
-                <tfoot className="bg-[var(--card-bg)] sticky bottom-0">
-                  <tr>
-                    <td colSpan={2} className="px-1 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
-                      Totales:
-                    </td>
-                    <td className="px-1 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
-                      {totalesCostoReal.totalRQ.toFixed(2)}
-                    </td>
-                    <td className="px-1 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
-                      {totalesCostoReal.totalOCBienes.toFixed(2)}
-                    </td>
-                    <td className="px-1 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
-                      {totalesCostoReal.totalOCServicios.toFixed(2)}
-                    </td>
-                    <td className="px-1 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
-                      {totalesCostoReal.totalRecepcion.toFixed(2)}
-                    </td>
-                    <td className={`px-1 py-2 text-right font-semibold border-r border-[var(--border-color)] text-xs ${totalesCostoReal.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {totalesCostoReal.diferencia >= 0 ? '+' : ''}{totalesCostoReal.diferencia.toFixed(2)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Modal de trazabilidad detallada */}
+      <ModalTrazabilidadDetalle
+        isOpen={!!recursoSeleccionado}
+        onClose={() => setRecursoSeleccionado(null)}
+        recurso={recursoSeleccionado}
+        todosLosRecursos={datosCostoReal}
+        trazabilidadDetalle={trazabilidadDetalle}
+        isLoading={isLoadingDetalle}
+        onSeleccionarRecurso={(nuevoRecurso) => {
+          setRecursoSeleccionado(nuevoRecurso);
+        }}
+      />
     </div>
   );
 }
