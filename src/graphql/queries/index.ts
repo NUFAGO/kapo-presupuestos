@@ -9,4 +9,5 @@ export * from './recurso.queries';
 export * from './apu.queries';
 export * from './precio-recurso.queries';
 export * from './aprobacion.queries';
+export * from './control-costos.queries';
 

@@ -24,6 +24,7 @@ interface SearchInputProps {
   inputHeight?: string; // Ej: "h-6", "h-8", etc.
   showInitialResults?: boolean; // Si true, muestra los primeros 7 resultados al hacer click
   initialResultsCount?: number; // Cantidad de resultados iniciales (default: 7)
+  showAllInitialResults?: boolean; // Si true, muestra todos los resultados iniciales sin límite
 }
 
 export function SearchInput({
@@ -36,6 +37,7 @@ export function SearchInput({
   inputHeight,
   showInitialResults = false,
   initialResultsCount = 7,
+  showAllInitialResults = false,
 }: SearchInputProps) {
   const [items, setItems] = useState<SearchItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -64,8 +66,10 @@ export function SearchInput({
     setIsSearching(true);
     try {
       const resultados = await onSearch("");
-      // Limitar a los primeros N resultados
-      const limitedResults = resultados.slice(0, initialResultsCount);
+      // Si showAllInitialResults es true, mostrar todos; si no, limitar
+      const limitedResults = showAllInitialResults 
+        ? resultados 
+        : resultados.slice(0, initialResultsCount);
       setItems(limitedResults);
       setSelectedIndex(-1);
       setHasLoadedInitial(true);
@@ -74,7 +78,7 @@ export function SearchInput({
     } finally {
       setIsSearching(false);
     }
-  }, [showInitialResults, initialResultsCount, hasLoadedInitial, onSearch]);
+  }, [showInitialResults, initialResultsCount, showAllInitialResults, hasLoadedInitial, onSearch]);
 
   const handleFocus = useCallback(() => {
     if (showInitialResults && !hasLoadedInitial) {
