@@ -365,9 +365,9 @@ export default function EstructuraCostosResumen({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col h-[calc(100vh-60px-48px)] overflow-y-auto overflow-x-hidden p-2">
       {/* Header */}
-      <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-2">
+      <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-2 flex-shrink-0 mb-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
@@ -383,11 +383,11 @@ export default function EstructuraCostosResumen({
       </div>
 
       {/* Layout de dos columnas */}
-      <div className="grid grid-cols-20 gap-3">
+      <div className="grid grid-cols-20 gap-3 flex-1 min-h-0">
         {/* Columna izquierda: Presupuesto Meta (55%) */}
-        <div className="col-span-11 space-y-3">
-          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden">
-            <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)]">
+        <div className="col-span-11 flex flex-col min-h-0">
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xs font-semibold text-[var(--text-primary)]">Presupuesto Meta</h2>
                 <div className="flex-1 max-w-xs">
@@ -399,7 +399,6 @@ export default function EstructuraCostosResumen({
                     className="w-full"
                     inputHeight="h-7"
                     showInitialResults={true}
-                    showAllInitialResults={true}
                     renderItem={(item) => (
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-mono text-[var(--text-secondary)]">{item.codigo}</span>
@@ -410,7 +409,7 @@ export default function EstructuraCostosResumen({
                 </div>
               </div>
             </div>
-            <div ref={tableRef} className="overflow-x-auto max-h-[calc(100vh-200px)]">
+            <div ref={tableRef} className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
               <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
                 <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
                   <tr>
@@ -543,12 +542,21 @@ export default function EstructuraCostosResumen({
                     }
                   })}
                 </tbody>
-                <tfoot className="bg-[var(--card-bg)] sticky bottom-0">
+              </table>
+            </div>
+            {/* Footer fijo */}
+            <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0">
+              <table className="w-full table-fixed text-xs">
+                <tfoot>
                   <tr>
-                    <td colSpan={5} className="px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)]">
+                    <td className="w-[100px]"></td>
+                    <td className="w-auto"></td>
+                    <td className="w-[90px]"></td>
+                    <td className="w-[110px]"></td>
+                    <td className="w-[130px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)]">
                       Total Presupuesto:
                     </td>
-                    <td className="px-2 py-2 text-right font-semibold text-[var(--text-primary)]">
+                    <td className="w-[150px] px-2 py-2 text-right font-semibold text-[var(--text-primary)]">
                       {totalPresupuesto.toFixed(2)}
                     </td>
                   </tr>
@@ -559,10 +567,10 @@ export default function EstructuraCostosResumen({
         </div>
 
         {/* Columna derecha: APU Meta y Costo Real + Proyección (45%) */}
-        <div className="col-span-9 space-y-3">
+        <div className="col-span-9 flex flex-col gap-3 min-h-0">
           {/* Contenedor APU Meta */}
-          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden">
-            <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)]">
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
               {/* Fila 1: Título */}
               <h2 className="text-xs font-semibold text-[var(--text-primary)] mb-1.5">APU Meta</h2>
               
@@ -652,7 +660,7 @@ export default function EstructuraCostosResumen({
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">Seleccione una partida para ver su APU</p>
               )}
             </div>
-            <div className="overflow-x-auto max-h-[calc(50vh-120px)]">
+            <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
               <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
                 <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
                   <tr>
@@ -717,52 +725,61 @@ export default function EstructuraCostosResumen({
                     ))
                   )}
                 </tbody>
-                {datosAPUMeta.length > 0 && (
-                  <tfoot className="bg-[var(--card-bg)] sticky bottom-0">
+              </table>
+            </div>
+            {/* Footer fijo */}
+            {datosAPUMeta.length > 0 && (
+              <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0">
+                <table className="w-full table-fixed text-xs">
+                  <tfoot>
                     <tr>
-                      <td colSpan={5} className="px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
+                      <td className="w-[80px]"></td>
+                      <td className="w-auto"></td>
+                      <td className="w-[50px]"></td>
+                      <td className="w-[85px]"></td>
+                      <td className="w-[70px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
                         Total APU:
                       </td>
-                      <td className="px-2 py-2 text-right font-semibold text-[var(--text-primary)] text-xs">
+                      <td className="w-[80px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] text-xs">
                         {totalAPU.toFixed(2)}
                       </td>
                     </tr>
                   </tfoot>
-                )}
-              </table>
-            </div>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Contenedor Costo Real + Proyección */}
-          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden">
-            <div className="bg-blue-500/10 px-3 py-2 border-b border-[var(--border-color)]">
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-blue-500/10 px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
               <h2 className="text-xs font-semibold text-[var(--text-primary)]">Costo Real + Proyección</h2>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">Análisis de ejecución vs presupuestado</p>
             </div>
-            <div className="overflow-y-auto max-h-[calc(50vh-120px)]">
+            <div className="overflow-y-auto overflow-x-auto flex-1 min-h-0">
               <div className="min-w-0">
-                <table className="w-full divide-y divide-[var(--border-color)] text-xs">
+                <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
                   <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
                     <tr>
-                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                      <th className="w-[80px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
                         Código
                       </th>
-                      <th className="px-1.5 py-1.5 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] min-w-[120px] max-w-[200px]">
+                      <th className="w-auto px-1.5 py-1.5 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px]">
                         Descripción
                       </th>
-                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
                         RQ
                       </th>
-                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
                         OC B
                       </th>
-                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
                         OC S
                       </th>
-                      <th className="px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
                         Recep.
                       </th>
-                      <th className="px-1.5 py-1.5 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      <th className="w-[100px] px-1.5 py-1.5 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-[10px] whitespace-nowrap">
                         Dif.
                       </th>
                     </tr>
@@ -826,30 +843,36 @@ export default function EstructuraCostosResumen({
                       ))
                     )}
                   </tbody>
-                  <tfoot className="bg-[var(--card-bg)] sticky bottom-0">
-                    <tr>
-                      <td colSpan={2} className="px-1.5 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
-                        Totales:
-                      </td>
-                      <td className="px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
-                        {totalesCostoReal.totalRQ.toFixed(2)}
-                      </td>
-                      <td className="px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
-                        {totalesCostoReal.totalOCBienes.toFixed(2)}
-                      </td>
-                      <td className="px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
-                        {totalesCostoReal.totalOCServicios.toFixed(2)}
-                      </td>
-                      <td className="px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
-                        {totalesCostoReal.totalRecepcion.toFixed(2)}
-                      </td>
-                      <td className={`px-1.5 py-2 text-right font-semibold text-xs whitespace-nowrap font-mono ${totalesCostoReal.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {totalesCostoReal.diferencia >= 0 ? '+' : ''}{totalesCostoReal.diferencia.toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
+            </div>
+            {/* Footer fijo */}
+            <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0">
+              <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
+                <tfoot>
+                  <tr>
+                    <td className="w-[80px]"></td>
+                    <td className="w-auto px-1.5 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
+                      Totales:
+                    </td>
+                    <td className="w-[90px] px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                      {totalesCostoReal.totalRQ.toFixed(2)}
+                    </td>
+                    <td className="w-[90px] px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                      {totalesCostoReal.totalOCBienes.toFixed(2)}
+                    </td>
+                    <td className="w-[90px] px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                      {totalesCostoReal.totalOCServicios.toFixed(2)}
+                    </td>
+                    <td className="w-[90px] px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                      {totalesCostoReal.totalRecepcion.toFixed(2)}
+                    </td>
+                    <td className={`w-[100px] px-1.5 py-2 text-right font-semibold text-xs whitespace-nowrap font-mono ${totalesCostoReal.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {totalesCostoReal.diferencia >= 0 ? '+' : ''}{totalesCostoReal.diferencia.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         </div>
