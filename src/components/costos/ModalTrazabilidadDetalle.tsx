@@ -264,14 +264,15 @@ export default function ModalTrazabilidadDetalle({
           <span className="ml-3 text-sm text-[var(--text-secondary)]">Cargando detalles...</span>
         </div>
       ) : (
-        <div className="flex gap-4 h-full min-h-0">
+        <div className="flex flex-col lg:flex-row gap-4 h-full min-h-0">
           {/* Panel lateral izquierdo - Lista de recursos */}
-          <div className="w-56 flex-shrink-0 border-r border-[var(--border-color)] pr-4 flex flex-col h-full min-h-0 bg-[var(--card-bg)] rounded-lg p-2">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 px-2 flex-shrink-0">
-              Recursos ({todosLosRecursos.length})
-            </h3>
-            <div className="space-y-1.5 pr-1" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {todosLosRecursos.map((r) => {
+          <div className="w-full lg:w-56 flex-shrink-0 flex flex-col h-full min-h-0">
+            <div className=" rounded-lg border p-3 flex flex-col h-full min-h-0">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 px-1 flex-shrink-0">
+                Recursos ({todosLosRecursos.length})
+              </h3>
+              <div className="space-y-2 pr-1 flex-1 min-h-0">
+                {todosLosRecursos.map((r) => {
                 // Obtener información del recurso desde trazabilidadDetalle si está disponible
                 const trazabilidadRecurso = trazabilidadDetalle?.trazabilidades?.find(
                   (t: any) => t.recurso_id === r.recurso_id
@@ -284,32 +285,33 @@ export default function ModalTrazabilidadDetalle({
                   <button
                     key={r.recurso_id}
                     onClick={() => onSeleccionarRecurso(r)}
-                    className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                    className={`w-full text-left px-3 py-2.5 rounded-lg text-xs transition-all duration-200 ${
                       r.recurso_id === recurso.recurso_id
-                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 font-semibold border border-purple-300 dark:border-purple-700'
-                        : 'bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--text-primary)] border border-[var(--border-color)]'
+                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 font-semibold card-shadow'
+                        : 'bg-[var(--background)] hover:bg-[var(--hover-bg)] text-[var(--text-primary)] card-shadow hover:shadow-md'
                     }`}
                   >
                     <div className="font-semibold truncate text-[var(--text-primary)]">{codigoRecurso}</div>
                     <div className="text-xs truncate mt-0.5 text-[var(--text-secondary)]">{descripcionRecurso}</div>
-                    <div className={`text-xs mt-1 font-semibold whitespace-nowrap ${r.diferencia >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    <div className={`text-xs mt-1.5 font-semibold whitespace-nowrap ${r.diferencia >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {r.diferencia >= 0 ? '+' : ''}S/{r.diferencia.toFixed(2)}
                     </div>
                   </button>
                 );
               })}
+              </div>
             </div>
           </div>
 
           {/* Contenido principal - Más compacto */}
-          <div className="flex-1 flex flex-col min-w-0 space-y-2 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 space-y-2 min-h-0 ">
             {/* Header con valores - Compacto */}
-            <div className="flex items-center justify-between gap-3 text-sm border-b border-[var(--border-color)] pb-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm border-b border-[var(--border-color)] pb-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[var(--text-secondary)]">Recurso:</span>
                 <span className="font-semibold text-[var(--text-primary)]">{recursoInfo.codigo}</span>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                 <div className="text-right">
                   <div className="text-xs text-[var(--text-secondary)]">Total RQ</div>
                   <div className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
@@ -332,9 +334,9 @@ export default function ModalTrazabilidadDetalle({
             </div>
 
             {/* Tarjetas de resumen - Más compactas */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Cantidades */}
-              <div className="bg-purple-100 dark:bg-purple-900/10 rounded p-3 border border-purple-200 dark:border-purple-800">
+              <div className="bg-purple-100 dark:bg-purple-900/10 rounded-lg p-3  card-shadow">
                 <div className="text-xs font-semibold text-purple-700 dark:text-purple-400 mb-2">
                   Cantidades
                 </div>
@@ -355,7 +357,7 @@ export default function ModalTrazabilidadDetalle({
               </div>
 
               {/* Costos */}
-              <div className="bg-green-500/10 dark:bg-green-900/10 rounded p-3 border border-green-200 dark:border-green-800">
+              <div className="bg-green-500/10 dark:bg-green-900/10 rounded-lg p-3 card-shadow">
                 <div className="text-xs font-semibold text-green-600 dark:text-green-400 mb-2">
                   Costos
                 </div>
@@ -372,7 +374,7 @@ export default function ModalTrazabilidadDetalle({
               </div>
 
               {/* Estado */}
-              <div className="bg-purple-100 dark:bg-purple-900/10 rounded p-3 border border-purple-200 dark:border-purple-800">
+              <div className="bg-purple-100 dark:bg-purple-900/10 rounded-lg p-3 card-shadow">
                 <div className="text-xs font-semibold text-purple-700 dark:text-purple-400 mb-2">
                   Estado
                 </div>
@@ -396,7 +398,7 @@ export default function ModalTrazabilidadDetalle({
               </div>
 
               {/* Alertas */}
-              <div className="bg-orange-100 dark:bg-orange-900/10 rounded p-3 border border-orange-200 dark:border-orange-800">
+              <div className="bg-orange-100 dark:bg-orange-900/10 rounded-lg p-3  card-shadow">
                 <div className="text-xs font-semibold text-orange-700 dark:text-orange-400 mb-2">
                   Alertas
                 </div>
@@ -424,8 +426,8 @@ export default function ModalTrazabilidadDetalle({
                 </h3>
               </div>
               <div className="overflow-x-auto flex-1 min-h-0" style={{ overflowY: 'auto' }}>
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-[var(--card-bg)] border-b border-[var(--border-color)]">
+                <table className="w-full text-xs min-w-[800px]">
+                  <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow border-b border-[var(--border-color)]">
                     <tr>
                       <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)]">Tipo</th>
                       <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)]">Código</th>
@@ -455,7 +457,7 @@ export default function ModalTrazabilidadDetalle({
                           <td className="px-3 py-2 font-medium text-[var(--text-primary)]">
                             {trans.codigo}
                           </td>
-                          <td className="px-3 py-2 text-[var(--text-secondary)] max-w-xs truncate">
+                          <td className="px-3 py-2 text-[var(--text-secondary)] max-w-[150px] truncate" title={trans.descripcion}>
                             {trans.descripcion}
                           </td>
                           <td className="px-3 py-2 text-right text-[var(--text-primary)]">

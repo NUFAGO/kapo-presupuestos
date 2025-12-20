@@ -2920,6 +2920,10 @@ export default function EstructuraPresupuestoEditor({
             partida={partidaSeleccionada ? partidas.find(p => p.id_partida === partidaSeleccionada) || null : null}
             apuCalculado={partidaSeleccionada && estructuraData?.apus ? estructuraData.apus.find(apu => apu.id_partida === partidaSeleccionada) || null : null}
             apusCalculados={estructuraData?.apus || null}
+            onCerrarPanel={() => {
+              setPanelInferiorHeight(0);
+              setItemSeleccionado(null);
+            }}
             onAgregarSubPartida={() => {
               setSubPartidaParaEditar(null);
               setModalAgregarSubPartidaAbierto(true);

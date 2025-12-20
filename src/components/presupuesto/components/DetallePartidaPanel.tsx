@@ -133,6 +133,7 @@ interface DetallePartidaPanelProps {
   subPartidaParaActualizar?: PartidaLocal | null;
   onLimpiarSubPartidaParaActualizar?: () => void;
   onEliminarSubPartida?: (idPartidaSubpartida: string) => void;
+  onCerrarPanel?: () => void;
 }
 
 export default function DetallePartidaPanel({
@@ -154,6 +155,7 @@ export default function DetallePartidaPanel({
   subPartidaParaActualizar,
   onLimpiarSubPartidaParaActualizar,
   onEliminarSubPartida,
+  onCerrarPanel,
 }: DetallePartidaPanelProps) {
   // Convertir modos especiales a 'lectura' si no son 'edicion'
   const modoReal = modo === 'edicion' ? 'edicion' : 'lectura';
@@ -2771,6 +2773,17 @@ export default function DetallePartidaPanel({
                   placeholder="0.00"
                   className="text-xs h-6 w-16 text-center px-1"
                 />
+              )}
+              {onCerrarPanel && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onCerrarPanel}
+                  className="h-6 w-6 p-0 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]"
+                  title="Cerrar panel"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
               )}
             </div>
           </div>

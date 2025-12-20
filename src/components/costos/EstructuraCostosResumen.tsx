@@ -35,6 +35,7 @@ export default function EstructuraCostosResumen({
     totalRecepcion: number;
     diferencia: number;
   } | null>(null);
+  const [tabActivo, setTabActivo] = useState<'presupuesto' | 'apu' | 'costos'>('presupuesto');
   const tableRef = useRef<HTMLDivElement>(null);
   const partidaRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
@@ -170,16 +171,10 @@ export default function EstructuraCostosResumen({
         items.push({ tipo: 'titulo', titulo: tituloActual });
       }
 
-      // Agregar partidas principales del título
+      // Agregar partidas principales del título (sin subpartidas)
       const partidasDelTitulo = getPartidasDeTitulo(id_titulo);
       partidasDelTitulo.forEach(partida => {
         items.push({ tipo: 'partida', partida });
-        
-        // Agregar subpartidas
-        const subpartidas = getSubpartidas(partida.id_partida);
-        subpartidas.forEach(subpartida => {
-          items.push({ tipo: 'partida', partida: subpartida });
-        });
       });
 
       // Agregar títulos hijos recursivamente
@@ -196,7 +191,7 @@ export default function EstructuraCostosResumen({
     });
 
     return items;
-  }, [titulos, partidas, getPartidasDeTitulo, getSubpartidas, getHijosTitulo]);
+  }, [titulos, partidas, getPartidasDeTitulo, getHijosTitulo]);
 
   // Lista de solo partidas para compatibilidad con otras funciones
   const partidasOrdenadas = useMemo(() => {
@@ -261,6 +256,23 @@ export default function EstructuraCostosResumen({
       };
     });
   }, [trazabilidadData, apuData]);
+
+  // Identificar recursos que están en el APU para resaltarlos
+  const recursosAPUSet = useMemo(() => {
+    const set = new Set<string>();
+    if (apuData?.recursos) {
+      apuData.recursos.forEach((recurso: any) => {
+        if (recurso.recurso_id) {
+          set.add(recurso.recurso_id);
+        }
+        // También agregar por código por si acaso
+        if (recurso.codigo_recurso) {
+          set.add(recurso.codigo_recurso);
+        }
+      });
+    }
+    return set;
+  }, [apuData]);
 
   const totalesCostoReal = useMemo(() => {
     return {
@@ -365,10 +377,10 @@ export default function EstructuraCostosResumen({
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-60px-48px)] overflow-y-auto overflow-x-hidden p-2">
+    <div className="flex flex-col h-[calc(100vh-60px-48px)]">
       {/* Header */}
       <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-2 flex-shrink-0 mb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
           <button
             onClick={() => router.back()}
             className="flex items-center justify-center p-1 rounded hover:bg-[var(--card-bg)]/60 transition-colors flex-shrink-0"
@@ -377,20 +389,57 @@ export default function EstructuraCostosResumen({
             <ArrowLeft className="h-4 w-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
           </button>
           <h1 className="text-xs font-semibold text-[var(--text-primary)]">
-            Gestión de Costos - Detalle completo de presupuesto, APU y costos reales
+            <span className="hidden sm:inline">Gestión de Costos - Detalle completo de presupuesto, APU y costos reales</span>
+            <span className="sm:hidden">Gestión de Costos</span>
           </h1>
         </div>
       </div>
 
-      {/* Layout de dos columnas */}
-      <div className="grid grid-cols-20 gap-3 flex-1 min-h-0">
-        {/* Columna izquierda: Presupuesto Meta (55%) */}
-        <div className="col-span-11 flex flex-col min-h-0">
+      {/* Tabs solo en pantallas pequeñas (móviles) */}
+      <div className="md:hidden mb-3 flex-shrink-0">
+        <div className="bg-[var(--card-bg)] rounded-lg border border-[var(--border-color)] p-1 flex gap-1">
+          <button
+            onClick={() => setTabActivo('presupuesto')}
+            className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
+              tabActivo === 'presupuesto'
+                ? 'bg-[var(--background)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]'
+            }`}
+          >
+            Presupuesto
+          </button>
+          <button
+            onClick={() => setTabActivo('apu')}
+            className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
+              tabActivo === 'apu'
+                ? 'bg-[var(--background)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]'
+            }`}
+          >
+            APU Meta
+          </button>
+          <button
+            onClick={() => setTabActivo('costos')}
+            className={`flex-1 px-3 py-2 text-xs font-medium rounded transition-colors ${
+              tabActivo === 'costos'
+                ? 'bg-[var(--background)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]'
+            }`}
+          >
+            Costos
+          </button>
+        </div>
+      </div>
+
+      {/* Layout de dos columnas en pantallas medianas (tablets) */}
+      <div className="hidden md:grid md:grid-cols-2 lg:hidden gap-3 flex-1 min-h-0">
+        {/* Columna izquierda: Presupuesto Meta */}
+        <div className="flex flex-col min-h-0">
           <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
             <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <h2 className="text-xs font-semibold text-[var(--text-primary)]">Presupuesto Meta</h2>
-                <div className="flex-1 max-w-xs">
+                <div className="flex-1 w-full sm:max-w-xs">
                   <SearchInput
                     placeholder="Buscar partida..."
                     minChars={1}
@@ -410,7 +459,7 @@ export default function EstructuraCostosResumen({
               </div>
             </div>
             <div ref={tableRef} className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
-              <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
+              <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs min-w-[600px]">
                 <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
                   <tr>
                     <th className="w-[100px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
@@ -419,16 +468,507 @@ export default function EstructuraCostosResumen({
                     <th className="w-auto px-2 py-1 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
                       Descripción
                     </th>
-                    <th className="w-[90px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                    <th className="w-[70px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
                       Und
                     </th>
-                    <th className="w-[110px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                    <th className="w-[100px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
                       Metrado
                     </th>
-                    <th className="w-[130px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                    <th className="w-[110px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
                       Precio
                     </th>
-                    <th className="w-[150px] px-2 py-1 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                    <th className="w-[110px] px-2 py-1 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                      Parcial
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-[var(--background)] divide-y divide-[var(--border-color)]">
+                  {itemsOrdenados.map((item, index) => {
+                    if (item.tipo === 'titulo') {
+                      const titulo = item.titulo;
+                      return (
+                        <tr
+                          key={`titulo-${titulo.id_titulo}`}
+                          className="bg-[var(--card-bg)] hover:bg-[var(--card-bg)]/80 transition-colors cursor-default"
+                        >
+                          <td className={`px-2 py-1 text-right border-r border-[var(--border-color)] whitespace-nowrap ${getColorPorNivel(titulo.id_titulo, 'TITULO')}`}>
+                            <span className="text-xs font-mono">
+                              {titulo.numero_item || ''}
+                            </span>
+                          </td>
+                          <td colSpan={5} className="px-2 py-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <div className="w-3 h-3 flex-shrink-0" />
+                              <span className={`text-xs font-medium truncate ${getColorPorNivel(titulo.id_titulo, 'TITULO')}`} title={titulo.descripcion}>
+                                {titulo.descripcion}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    } else {
+                      const partida = item.partida;
+                      const estaColapsado = partidasColapsadas.has(partida.id_partida);
+                      const tieneSubpartidas = getSubpartidas(partida.id_partida).length > 0;
+                      // No mostrar subpartidas, solo partidas principales
+                      if (partida.id_partida_padre) {
+                        return null;
+                      }
+
+                      return (
+                        <tr
+                          key={partida.id_partida}
+                          ref={(el) => {
+                            if (el) {
+                              partidaRefs.current.set(partida.id_partida, el);
+                            } else {
+                              partidaRefs.current.delete(partida.id_partida);
+                            }
+                          }}
+                          onClick={() => setPartidaSeleccionada(partida)}
+                          className={`bg-[var(--background)] transition-colors cursor-pointer hover:bg-[var(--hover-bg)] ${
+                            partidaSeleccionada?.id_partida === partida.id_partida ? 'bg-blue-500/20 ring-2 ring-blue-500/50' : ''
+                          }`}
+                        >
+                          <td className="px-2 py-1 text-right border-r border-[var(--border-color)] whitespace-nowrap">
+                            <span className="text-xs font-mono text-[var(--text-secondary)]">{calcularNumeroItem(partida)}</span>
+                          </td>
+                          <td className="px-2 py-1 border-r border-[var(--border-color)] max-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {tieneSubpartidas ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleColapsoPartida(partida.id_partida);
+                                  }}
+                                  className="flex-shrink-0 w-3 h-3 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                >
+                                  {estaColapsado ? (
+                                    <ChevronRight className="h-3 w-3" />
+                                  ) : (
+                                    <ChevronDown className="h-3 w-3" />
+                                  )}
+                                </button>
+                              ) : (
+                                <div className="w-3 h-3 flex-shrink-0" />
+                              )}
+                              <span className="text-[var(--text-primary)] truncate flex-1 min-w-0" title={partida.descripcion}>
+                                {partida.descripcion}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
+                            <span className="text-xs text-[var(--text-secondary)]">{partida.unidad_medida || '-'}</span>
+                          </td>
+                          <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
+                            <span className="text-xs text-[var(--text-secondary)]">
+                              {partida.metrado !== undefined && partida.metrado !== null && !isNaN(partida.metrado)
+                                ? partida.metrado.toFixed(2)
+                                : '-'}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
+                            <span className="text-xs text-[var(--text-secondary)]">
+                              {partida.precio_unitario !== undefined && partida.precio_unitario !== null && !isNaN(partida.precio_unitario)
+                                ? partida.precio_unitario.toFixed(2)
+                                : '-'}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1 text-right whitespace-nowrap">
+                            <span className="text-xs text-[var(--text-secondary)]">
+                              {partida.parcial_partida !== undefined && partida.parcial_partida !== null && !isNaN(partida.parcial_partida)
+                                ? partida.parcial_partida.toFixed(2)
+                                : '-'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+              <table className="w-full table-fixed text-xs min-w-[600px]">
+                <tfoot>
+                  <tr>
+                    <td className="w-[100px]"></td>
+                    <td className="w-auto"></td>
+                    <td className="w-[70px]"></td>
+                    <td className="w-[100px]"></td>
+                    <td className="w-[110px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)]">
+                      Total Presupuesto:
+                    </td>
+                    <td className="w-[110px] px-2 py-2 text-right font-semibold text-[var(--text-primary)]">
+                      {totalPresupuesto.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Columna derecha: APU Meta y Costo Real + Proyección apilados */}
+        <div className="flex flex-col gap-3 min-h-0">
+          {/* APU Meta */}
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
+              <h2 className="text-xs font-semibold text-[var(--text-primary)] mb-1.5">APU Meta</h2>
+              {partidaSeleccionada ? (
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-3 gap-x-2 gap-y-0.5 text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[var(--text-secondary)] min-w-[45px] text-xs">Ítem:</span>
+                      <Input
+                        type="text"
+                        value={partidaSeleccionada.numero_item || '-'}
+                        disabled
+                        className="h-6 text-xs px-2 font-mono"
+                      />
+                    </div>
+                    {apuData && (
+                      <>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[var(--text-secondary)] min-w-[60px] text-xs">Rend:</span>
+                          <Input
+                            type="text"
+                            value={apuData.rendimiento ? apuData.rendimiento.toFixed(4) : '-'}
+                            disabled
+                            className="h-6 text-xs px-2"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[var(--text-secondary)] min-w-[50px] text-xs">Jorn:</span>
+                          <Input
+                            type="text"
+                            value={apuData.jornada ? `${apuData.jornada.toFixed(2)} h` : '-'}
+                            disabled
+                            className="h-6 text-xs px-2"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-x-2 gap-y-0.5 text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[var(--text-secondary)] min-w-[30px] text-xs">Und:</span>
+                      <Input
+                        type="text"
+                        value={partidaSeleccionada.unidad_medida || '-'}
+                        disabled
+                        className="h-6 text-xs px-2"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[var(--text-secondary)] min-w-[45px] text-xs">Met:</span>
+                      <Input
+                        type="text"
+                        value={partidaSeleccionada.metrado !== undefined && partidaSeleccionada.metrado !== null && !isNaN(partidaSeleccionada.metrado)
+                          ? partidaSeleccionada.metrado.toFixed(2)
+                          : '-'}
+                        disabled
+                        className="h-6 text-xs px-2"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[var(--text-secondary)] min-w-[50px] text-xs">P.U.:</span>
+                      <Input
+                        type="text"
+                        value={partidaSeleccionada.precio_unitario !== undefined && partidaSeleccionada.precio_unitario !== null && !isNaN(partidaSeleccionada.precio_unitario)
+                          ? `S/ ${partidaSeleccionada.precio_unitario.toFixed(2)}`
+                          : '-'}
+                        disabled
+                        className="h-6 text-xs px-2"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[var(--text-secondary)] min-w-[40px] text-xs">Par:</span>
+                      <Input
+                        type="text"
+                        value={partidaSeleccionada.parcial_partida !== undefined && partidaSeleccionada.parcial_partida !== null && !isNaN(partidaSeleccionada.parcial_partida)
+                          ? `S/ ${partidaSeleccionada.parcial_partida.toFixed(2)}`
+                          : '-'}
+                        disabled
+                        className="h-6 text-xs px-2 font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Seleccione una partida para ver su APU</p>
+              )}
+            </div>
+            <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+              <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[450px]">
+                <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
+                  <tr>
+                    <th className="w-[70px] px-1.5 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px]">
+                      Código
+                    </th>
+                    <th className="w-auto px-1.5 py-1 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px]">
+                      Descripción
+                    </th>
+                    <th className="w-[40px] px-1.5 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px]">
+                      Und
+                    </th>
+                    <th className="w-[70px] px-1.5 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px]">
+                      Cant.
+                    </th>
+                    <th className="w-[60px] px-1.5 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px]">
+                      Precio
+                    </th>
+                    <th className="w-[70px] px-1.5 py-1 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-[10px]">
+                      Parcial
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-[var(--background)] divide-y divide-[var(--border-color)]">
+                  {isLoadingApu ? (
+                    <tr>
+                      <td colSpan={6} className="px-1.5 py-4 text-center text-xs text-[var(--text-secondary)]">
+                        <LoadingSpinner size={20} showText={false} />
+                        <span className="ml-2">Cargando APU...</span>
+                      </td>
+                    </tr>
+                  ) : datosAPUMeta.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-1.5 py-4 text-center text-xs text-[var(--text-secondary)]">
+                        {partidaSeleccionada 
+                          ? 'Esta partida no tiene APU asociado'
+                          : 'Seleccione una partida para ver su APU'}
+                      </td>
+                    </tr>
+                  ) : (
+                    datosAPUMeta.map((item, index) => (
+                      <tr key={index} className="hover:bg-[var(--hover-bg)] transition-colors">
+                        <td className="px-1.5 py-1 text-center border-r border-[var(--border-color)] text-xs">
+                          {item.codigo}
+                        </td>
+                        <td className="px-1.5 py-1 border-r border-[var(--border-color)] text-xs">
+                          {item.descripcion}
+                        </td>
+                        <td className="px-1.5 py-1 text-center border-r border-[var(--border-color)] text-xs">
+                          {item.unidad}
+                        </td>
+                        <td className="px-1.5 py-1 text-center border-r border-[var(--border-color)] text-xs">
+                          {item.cantidad.toFixed(2)}
+                        </td>
+                        <td className="px-1.5 py-1 text-center border-r border-[var(--border-color)] text-xs">
+                          {item.precio.toFixed(2)}
+                        </td>
+                        <td className="px-1.5 py-1 text-right text-xs">
+                          {item.parcial.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {datosAPUMeta.length > 0 && (
+              <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+                <table className="w-full text-xs min-w-[450px]">
+                  <tfoot>
+                    <tr>
+                      <td className="w-[70px]"></td>
+                      <td className="w-auto"></td>
+                      <td className="w-[40px]"></td>
+                      <td className="w-[70px]"></td>
+                      <td className="w-[60px] px-1.5 py-1.5 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
+                        Total:
+                      </td>
+                      <td className="w-[70px] px-1.5 py-1.5 text-right font-semibold text-[var(--text-primary)] text-xs">
+                        {totalAPU.toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Costo Real + Proyección */}
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-blue-500/10 px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
+              <h2 className="text-xs font-semibold text-[var(--text-primary)]">Costo Real + Proyección</h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">Análisis de ejecución vs presupuestado</p>
+            </div>
+            <div className="overflow-y-auto overflow-x-auto flex-1 min-h-0">
+              <div className="min-w-0">
+                <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[600px]">
+                  <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
+                    <tr>
+                      <th className="w-[70px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        Código
+                      </th>
+                      <th className="w-auto px-1 py-1 text-left font-semibold text-[var(--text-secondary)] tracking-wider border-r border-[var(--border-color)] text-[10px]">
+                        Descripción
+                      </th>
+                      <th className="w-[75px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        RQ
+                      </th>
+                      <th className="w-[75px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        OC B
+                      </th>
+                      <th className="w-[75px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        OC S
+                      </th>
+                      <th className="w-[75px] px-1 py-1 text-center font-semibold text-[var(--text-secondary)] tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        Recep.
+                      </th>
+                      <th className="w-[80px] px-1 py-1 text-right font-semibold text-[var(--text-secondary)] tracking-wider text-[10px] whitespace-nowrap">
+                        Dif.
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-[var(--background)] divide-y divide-[var(--border-color)]">
+                    {isLoadingTrazabilidad ? (
+                      <tr>
+                        <td colSpan={7} className="px-1 py-4 text-center text-xs text-[var(--text-secondary)]">
+                          <LoadingSpinner size={20} showText={false} />
+                          <span className="ml-2">Cargando datos de trazabilidad...</span>
+                        </td>
+                      </tr>
+                    ) : datosCostoReal.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-1 py-4 text-center text-xs text-[var(--text-secondary)]">
+                          {partidaSeleccionada 
+                            ? 'Esta partida no tiene datos de trazabilidad'
+                            : 'Seleccione una partida para ver los costos reales'}
+                        </td>
+                      </tr>
+                    ) : (
+                      datosCostoReal.map((item: any, index: number) => {
+                        const esRecursoAPU = recursosAPUSet.has(item.recurso_id) || recursosAPUSet.has(item.codigo);
+                        return (
+                      <tr 
+                        key={index} 
+                        className={`transition-colors cursor-pointer ${
+                          esRecursoAPU 
+                            ? 'bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 border-l-4 border-l-blue-500' 
+                            : 'hover:bg-[var(--hover-bg)]'
+                        }`}
+                        onClick={() => {
+                          setRecursoSeleccionado({
+                            recurso_id: item.recurso_id,
+                            codigo: item.codigo,
+                            descripcion: item.descripcion,
+                            totalRQ: item.totalRQ,
+                            totalOCBienes: item.totalOCBienes,
+                            totalOCServicios: item.totalOCServicios,
+                            totalRecepcion: item.totalRecepcion,
+                            diferencia: item.diferencia,
+                          });
+                        }}
+                      >
+                        <td className={`px-1 py-1 text-center border-r border-[var(--border-color)] text-xs font-mono whitespace-nowrap ${esRecursoAPU ? 'font-semibold' : ''}`}>
+                          {item.codigo}
+                        </td>
+                        <td className={`px-1 py-1 border-r border-[var(--border-color)] text-xs truncate max-w-[150px] ${esRecursoAPU ? 'font-semibold' : ''}`} title={item.descripcion}>
+                          {item.descripcion}
+                        </td>
+                        <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                          {item.totalRQ.toFixed(2)}
+                        </td>
+                        <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                          {item.totalOCBienes.toFixed(2)}
+                        </td>
+                        <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                          {item.totalOCServicios.toFixed(2)}
+                        </td>
+                        <td className="px-1 py-1 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                          {item.totalRecepcion.toFixed(2)}
+                        </td>
+                        <td className={`px-1 py-1 text-right text-xs whitespace-nowrap font-mono ${item.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {item.diferencia >= 0 ? '+' : ''}{item.diferencia.toFixed(2)}
+                        </td>
+                      </tr>
+                      );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+              <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[600px]">
+                <tfoot>
+                  <tr>
+                    <td className="w-[70px]"></td>
+                    <td className="w-auto px-1 py-1.5 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
+                      Totales:
+                    </td>
+                    <td className="w-[75px] px-1 py-1.5 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                      {totalesCostoReal.totalRQ.toFixed(2)}
+                    </td>
+                    <td className="w-[75px] px-1 py-1.5 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                      {totalesCostoReal.totalOCBienes.toFixed(2)}
+                    </td>
+                    <td className="w-[75px] px-1 py-1.5 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                      {totalesCostoReal.totalOCServicios.toFixed(2)}
+                    </td>
+                    <td className="w-[75px] px-1 py-1.5 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                      {totalesCostoReal.totalRecepcion.toFixed(2)}
+                    </td>
+                    <td className={`w-[80px] px-1 py-1.5 text-right font-semibold text-xs whitespace-nowrap font-mono ${totalesCostoReal.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {totalesCostoReal.diferencia >= 0 ? '+' : ''}{totalesCostoReal.diferencia.toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Layout de dos columnas en pantallas grandes (lg) */}
+      <div className="hidden lg:grid lg:grid-cols-20 gap-3 flex-1 min-h-0">
+        {/* Columna izquierda: Presupuesto Meta (55%) */}
+        <div className="lg:col-span-11 flex flex-col min-h-0">
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+            <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <h2 className="text-xs font-semibold text-[var(--text-primary)]">Presupuesto Meta</h2>
+                <div className="flex-1 w-full sm:max-w-xs">
+                  <SearchInput
+                    placeholder="Buscar partida..."
+                    minChars={1}
+                    onSearch={buscarPartidas}
+                    onSelect={handleSeleccionarPartida}
+                    className="w-full"
+                    inputHeight="h-7"
+                    showInitialResults={true}
+                    renderItem={(item) => (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-[var(--text-secondary)]">{item.codigo}</span>
+                        <span className="text-[11px] text-[var(--text-primary)] truncate">{item.nombre.replace(`${item.codigo} - `, '')}</span>
+                      </div>
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
+            <div ref={tableRef} className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+              <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs min-w-[600px]">
+                <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
+                  <tr>
+                    <th className="w-[100px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                      Ítem
+                    </th>
+                    <th className="w-auto px-2 py-1 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                      Descripción
+                    </th>
+                    <th className="w-[70px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                      Und
+                    </th>
+                    <th className="w-[100px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                      Metrado
+                    </th>
+                    <th className="w-[110px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                      Precio
+                    </th>
+                    <th className="w-[110px] px-2 py-1 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
                       Parcial
                     </th>
                   </tr>
@@ -449,9 +989,9 @@ export default function EstructuraCostosResumen({
                             </span>
                           </td>
                           <td colSpan={5} className="px-2 py-1">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 min-w-0">
                               <div className="w-3 h-3 flex-shrink-0" />
-                              <span className={`text-xs font-medium ${getColorPorNivel(titulo.id_titulo, 'TITULO')}`}>
+                              <span className={`text-xs font-medium truncate ${getColorPorNivel(titulo.id_titulo, 'TITULO')}`} title={titulo.descripcion}>
                                 {titulo.descripcion}
                               </span>
                             </div>
@@ -463,11 +1003,8 @@ export default function EstructuraCostosResumen({
                       const partida = item.partida;
                       const estaColapsado = partidasColapsadas.has(partida.id_partida);
                       const tieneSubpartidas = getSubpartidas(partida.id_partida).length > 0;
-                      const esSubpartida = !!partida.id_partida_padre;
-
-                      // Verificar si está oculto por colapso de su partida padre
-                      const estaOculto = partida.id_partida_padre && partidasColapsadas.has(partida.id_partida_padre);
-                      if (estaOculto) {
+                      // No mostrar subpartidas, solo partidas principales
+                      if (partida.id_partida_padre) {
                         return null;
                       }
 
@@ -482,15 +1019,15 @@ export default function EstructuraCostosResumen({
                             }
                           }}
                           onClick={() => setPartidaSeleccionada(partida)}
-                          className={`${esSubpartida ? 'bg-[var(--background)]/50' : 'bg-[var(--background)]'} transition-colors cursor-pointer hover:bg-[var(--hover-bg)] ${
+                          className={`bg-[var(--background)] transition-colors cursor-pointer hover:bg-[var(--hover-bg)] ${
                             partidaSeleccionada?.id_partida === partida.id_partida ? 'bg-blue-500/20 ring-2 ring-blue-500/50' : ''
                           }`}
                         >
                           <td className="px-2 py-1 text-right border-r border-[var(--border-color)] whitespace-nowrap">
                             <span className="text-xs font-mono text-[var(--text-secondary)]">{calcularNumeroItem(partida)}</span>
                           </td>
-                          <td className="px-2 py-1 border-r border-[var(--border-color)]">
-                            <div className="flex items-center gap-1.5">
+                          <td className="px-2 py-1 border-r border-[var(--border-color)] max-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
                               {tieneSubpartidas ? (
                                 <button
                                   onClick={(e) => {
@@ -508,7 +1045,7 @@ export default function EstructuraCostosResumen({
                               ) : (
                                 <div className="w-3 h-3 flex-shrink-0" />
                               )}
-                              <span className="text-[var(--text-primary)]">
+                              <span className="text-[var(--text-primary)] truncate flex-1 min-w-0" title={partida.descripcion}>
                                 {partida.descripcion}
                               </span>
                             </div>
@@ -545,18 +1082,18 @@ export default function EstructuraCostosResumen({
               </table>
             </div>
             {/* Footer fijo */}
-            <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0">
-              <table className="w-full table-fixed text-xs">
+            <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+              <table className="w-full table-fixed text-xs min-w-[600px]">
                 <tfoot>
                   <tr>
                     <td className="w-[100px]"></td>
                     <td className="w-auto"></td>
-                    <td className="w-[90px]"></td>
-                    <td className="w-[110px]"></td>
-                    <td className="w-[130px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)]">
+                    <td className="w-[70px]"></td>
+                    <td className="w-[100px]"></td>
+                    <td className="w-[110px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)]">
                       Total Presupuesto:
                     </td>
-                    <td className="w-[150px] px-2 py-2 text-right font-semibold text-[var(--text-primary)]">
+                    <td className="w-[110px] px-2 py-2 text-right font-semibold text-[var(--text-primary)]">
                       {totalPresupuesto.toFixed(2)}
                     </td>
                   </tr>
@@ -567,7 +1104,7 @@ export default function EstructuraCostosResumen({
         </div>
 
         {/* Columna derecha: APU Meta y Costo Real + Proyección (45%) */}
-        <div className="col-span-9 flex flex-col gap-3 min-h-0">
+        <div className="lg:col-span-9 flex flex-col gap-3 min-h-0">
           {/* Contenedor APU Meta */}
           <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
             <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
@@ -577,7 +1114,7 @@ export default function EstructuraCostosResumen({
               {partidaSeleccionada ? (
                 <div className="space-y-1.5">
                   {/* Fila 2: Ítem, Rendimiento, Jornada */}
-                  <div className="grid grid-cols-3 gap-x-3 gap-y-0.5 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-0.5 text-xs">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[var(--text-secondary)] min-w-[50px] text-xs">Ítem:</span>
                       <Input
@@ -611,7 +1148,7 @@ export default function EstructuraCostosResumen({
                     )}
                   </div>
                   {/* Fila 3: Und, Metrado, P. Unitario, Parcial */}
-                  <div className="grid grid-cols-4 gap-x-3 gap-y-0.5 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-0.5 text-xs">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[var(--text-secondary)] min-w-[35px] text-xs">Und:</span>
                       <Input
@@ -661,7 +1198,7 @@ export default function EstructuraCostosResumen({
               )}
             </div>
             <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
-              <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
+              <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[500px] lg:table-fixed">
                 <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
                   <tr>
                     <th className="w-[80px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
@@ -729,8 +1266,8 @@ export default function EstructuraCostosResumen({
             </div>
             {/* Footer fijo */}
             {datosAPUMeta.length > 0 && (
-              <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0">
-                <table className="w-full table-fixed text-xs">
+              <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+                <table className="w-full text-xs min-w-[500px] lg:table-fixed">
                   <tfoot>
                     <tr>
                       <td className="w-[80px]"></td>
@@ -758,28 +1295,28 @@ export default function EstructuraCostosResumen({
             </div>
             <div className="overflow-y-auto overflow-x-auto flex-1 min-h-0">
               <div className="min-w-0">
-                <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
+                <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[700px] lg:table-fixed">
                   <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
                     <tr>
-                      <th className="w-[80px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                      <th className="w-[80px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
                         Código
                       </th>
-                      <th className="w-auto px-1.5 py-1.5 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px]">
+                      <th className="w-auto px-1.5 py-1.5 text-left font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px]">
                         Descripción
                       </th>
-                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
-                        RQ
+                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        Requeremientos
                       </th>
-                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
-                        OC B
+                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        OC Bienes
                       </th>
-                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
-                        OC S
+                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                        OC Servicios
                       </th>
-                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                      <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
                         Recep.
                       </th>
-                      <th className="w-[100px] px-1.5 py-1.5 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-[10px] whitespace-nowrap">
+                      <th className="w-[100px] px-1.5 py-1.5 text-right font-semibold text-[var(--text-secondary)]  tracking-wider text-[10px] whitespace-nowrap">
                         Dif.
                       </th>
                     </tr>
@@ -801,10 +1338,16 @@ export default function EstructuraCostosResumen({
                         </td>
                       </tr>
                     ) : (
-                      datosCostoReal.map((item: any, index: number) => (
+                      datosCostoReal.map((item: any, index: number) => {
+                        const esRecursoAPU = recursosAPUSet.has(item.recurso_id) || recursosAPUSet.has(item.codigo);
+                        return (
                       <tr 
                         key={index} 
-                        className="hover:bg-[var(--hover-bg)] transition-colors cursor-pointer"
+                        className={`transition-colors cursor-pointer ${
+                          esRecursoAPU 
+                            ? 'bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 border-l-4 border-l-blue-500' 
+                            : 'hover:bg-[var(--hover-bg)]'
+                        }`}
                         onClick={() => {
                           setRecursoSeleccionado({
                             recurso_id: item.recurso_id,
@@ -818,10 +1361,10 @@ export default function EstructuraCostosResumen({
                           });
                         }}
                       >
-                        <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs font-medium whitespace-nowrap">
+                        <td className={`px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs font-mono whitespace-nowrap ${esRecursoAPU ? 'font-semibold' : ''}`}>
                           {item.codigo}
                         </td>
-                        <td className="px-1.5 py-1.5 border-r border-[var(--border-color)] text-xs truncate max-w-[200px]" title={item.descripcion}>
+                        <td className={`px-1.5 py-1.5 border-r border-[var(--border-color)] text-xs truncate max-w-[200px] ${esRecursoAPU ? 'font-semibold' : ''}`} title={item.descripcion}>
                           {item.descripcion}
                         </td>
                         <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
@@ -836,19 +1379,20 @@ export default function EstructuraCostosResumen({
                         <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
                           {item.totalRecepcion.toFixed(2)}
                         </td>
-                        <td className={`px-1.5 py-1.5 text-right text-xs whitespace-nowrap font-mono font-semibold ${item.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <td className={`px-1.5 py-1.5 text-right text-xs whitespace-nowrap font-mono ${item.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {item.diferencia >= 0 ? '+' : ''}{item.diferencia.toFixed(2)}
                         </td>
                       </tr>
-                      ))
+                      );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
             {/* Footer fijo */}
-            <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0">
-              <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs">
+            <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+              <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[700px] lg:table-fixed">
                 <tfoot>
                   <tr>
                     <td className="w-[80px]"></td>
@@ -876,6 +1420,504 @@ export default function EstructuraCostosResumen({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Contenido por tabs en pantallas pequeñas (móviles) */}
+      <div className="md:hidden flex-1 min-h-0">
+        {/* Presupuesto Meta */}
+        {tabActivo === 'presupuesto' && (
+          <div className="h-full flex flex-col min-h-0">
+            <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <h2 className="text-xs font-semibold text-[var(--text-primary)]">Presupuesto Meta</h2>
+                  <div className="flex-1 w-full sm:max-w-xs">
+                    <SearchInput
+                      placeholder="Buscar partida..."
+                      minChars={1}
+                      onSearch={buscarPartidas}
+                      onSelect={handleSeleccionarPartida}
+                      className="w-full"
+                      inputHeight="h-7"
+                      showInitialResults={true}
+                      renderItem={(item) => (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono text-[var(--text-secondary)]">{item.codigo}</span>
+                          <span className="text-[11px] text-[var(--text-primary)] truncate">{item.nombre.replace(`${item.codigo} - `, '')}</span>
+                        </div>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div ref={tableRef} className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+                <table className="w-full table-fixed divide-y divide-[var(--border-color)] text-xs min-w-[600px]">
+                  <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
+                    <tr>
+                      <th className="w-[100px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                        Ítem
+                      </th>
+                      <th className="w-auto px-2 py-1 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                        Descripción
+                      </th>
+                      <th className="w-[70px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                        Und
+                      </th>
+                      <th className="w-[100px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                        Metrado
+                      </th>
+                      <th className="w-[110px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)]">
+                        Precio
+                      </th>
+                      <th className="w-[110px] px-2 py-1 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+                        Parcial
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-[var(--background)] divide-y divide-[var(--border-color)]">
+                    {itemsOrdenados.map((item, index) => {
+                      if (item.tipo === 'titulo') {
+                        const titulo = item.titulo;
+                        return (
+                          <tr
+                            key={`titulo-${titulo.id_titulo}`}
+                            className="bg-[var(--card-bg)] hover:bg-[var(--card-bg)]/80 transition-colors cursor-default"
+                          >
+                            <td className={`px-2 py-1 text-right border-r border-[var(--border-color)] whitespace-nowrap ${getColorPorNivel(titulo.id_titulo, 'TITULO')}`}>
+                              <span className="text-xs font-mono">
+                                {titulo.numero_item || ''}
+                              </span>
+                            </td>
+                          <td colSpan={5} className="px-2 py-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <div className="w-3 h-3 flex-shrink-0" />
+                              <span className={`text-xs font-medium truncate ${getColorPorNivel(titulo.id_titulo, 'TITULO')}`} title={titulo.descripcion}>
+                                {titulo.descripcion}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    } else {
+                      const partida = item.partida;
+                      const estaColapsado = partidasColapsadas.has(partida.id_partida);
+                        const tieneSubpartidas = getSubpartidas(partida.id_partida).length > 0;
+                        // No mostrar subpartidas, solo partidas principales
+                        if (partida.id_partida_padre) {
+                          return null;
+                        }
+
+                        return (
+                          <tr
+                            key={partida.id_partida}
+                            ref={(el) => {
+                              if (el) {
+                                partidaRefs.current.set(partida.id_partida, el);
+                              } else {
+                                partidaRefs.current.delete(partida.id_partida);
+                              }
+                            }}
+                            onClick={() => setPartidaSeleccionada(partida)}
+                            className={`bg-[var(--background)] transition-colors cursor-pointer hover:bg-[var(--hover-bg)] ${
+                              partidaSeleccionada?.id_partida === partida.id_partida ? 'bg-blue-500/20 ring-2 ring-blue-500/50' : ''
+                            }`}
+                          >
+                            <td className="px-2 py-1 text-right border-r border-[var(--border-color)] whitespace-nowrap">
+                              <span className="text-xs font-mono text-[var(--text-secondary)]">{calcularNumeroItem(partida)}</span>
+                            </td>
+                            <td className="px-2 py-1 border-r border-[var(--border-color)]">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {tieneSubpartidas ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleColapsoPartida(partida.id_partida);
+                                    }}
+                                    className="flex-shrink-0 w-3 h-3 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                  >
+                                    {estaColapsado ? (
+                                      <ChevronRight className="h-3 w-3" />
+                                    ) : (
+                                      <ChevronDown className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                ) : (
+                                  <div className="w-3 h-3 flex-shrink-0" />
+                                )}
+                                <span className="text-[var(--text-primary)] truncate" title={partida.descripcion}>
+                                  {partida.descripcion}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
+                              <span className="text-xs text-[var(--text-secondary)]">{partida.unidad_medida || '-'}</span>
+                            </td>
+                            <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
+                              <span className="text-xs text-[var(--text-secondary)]">
+                                {partida.metrado !== undefined && partida.metrado !== null && !isNaN(partida.metrado)
+                                  ? partida.metrado.toFixed(2)
+                                  : '-'}
+                              </span>
+                            </td>
+                            <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
+                              <span className="text-xs text-[var(--text-secondary)]">
+                                {partida.precio_unitario !== undefined && partida.precio_unitario !== null && !isNaN(partida.precio_unitario)
+                                  ? partida.precio_unitario.toFixed(2)
+                                  : '-'}
+                              </span>
+                            </td>
+                            <td className="px-2 py-1 text-right whitespace-nowrap">
+                              <span className="text-xs text-[var(--text-secondary)]">
+                                {partida.parcial_partida !== undefined && partida.parcial_partida !== null && !isNaN(partida.parcial_partida)
+                                  ? partida.parcial_partida.toFixed(2)
+                                  : '-'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      }
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+                <table className="w-full table-fixed text-xs min-w-[600px]">
+                  <tfoot>
+                    <tr>
+                      <td className="w-[100px]"></td>
+                      <td className="w-auto"></td>
+                      <td className="w-[70px]"></td>
+                      <td className="w-[100px]"></td>
+                      <td className="w-[110px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)]">
+                        Total Presupuesto:
+                      </td>
+                      <td className="w-[110px] px-2 py-2 text-right font-semibold text-[var(--text-primary)]">
+                        {totalPresupuesto.toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* APU Meta */}
+        {tabActivo === 'apu' && (
+          <div className="h-full flex flex-col min-h-0">
+            <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
+                <h2 className="text-xs font-semibold text-[var(--text-primary)] mb-1.5">APU Meta</h2>
+                {partidaSeleccionada ? (
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-0.5 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[var(--text-secondary)] min-w-[50px] text-xs">Ítem:</span>
+                        <Input
+                          type="text"
+                          value={partidaSeleccionada.numero_item || '-'}
+                          disabled
+                          className="h-6 text-xs px-2 font-mono"
+                        />
+                      </div>
+                      {apuData && (
+                        <>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[var(--text-secondary)] min-w-[70px] text-xs">Rendimiento:</span>
+                            <Input
+                              type="text"
+                              value={apuData.rendimiento ? apuData.rendimiento.toFixed(4) : '-'}
+                              disabled
+                              className="h-6 text-xs px-2"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[var(--text-secondary)] min-w-[60px] text-xs">Jornada:</span>
+                            <Input
+                              type="text"
+                              value={apuData.jornada ? `${apuData.jornada.toFixed(2)} h` : '-'}
+                              disabled
+                              className="h-6 text-xs px-2"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-0.5 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[var(--text-secondary)] min-w-[35px] text-xs">Und:</span>
+                        <Input
+                          type="text"
+                          value={partidaSeleccionada.unidad_medida || '-'}
+                          disabled
+                          className="h-6 text-xs px-2"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[var(--text-secondary)] min-w-[55px] text-xs">Metrado:</span>
+                        <Input
+                          type="text"
+                          value={partidaSeleccionada.metrado !== undefined && partidaSeleccionada.metrado !== null && !isNaN(partidaSeleccionada.metrado)
+                            ? partidaSeleccionada.metrado.toFixed(2)
+                            : '-'}
+                          disabled
+                          className="h-6 text-xs px-2"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[var(--text-secondary)] min-w-[70px] text-xs">P. Unitario:</span>
+                        <Input
+                          type="text"
+                          value={partidaSeleccionada.precio_unitario !== undefined && partidaSeleccionada.precio_unitario !== null && !isNaN(partidaSeleccionada.precio_unitario)
+                            ? `S/ ${partidaSeleccionada.precio_unitario.toFixed(2)}`
+                            : '-'}
+                          disabled
+                          className="h-6 text-xs px-2"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[var(--text-secondary)] min-w-[50px] text-xs">Parcial:</span>
+                        <Input
+                          type="text"
+                          value={partidaSeleccionada.parcial_partida !== undefined && partidaSeleccionada.parcial_partida !== null && !isNaN(partidaSeleccionada.parcial_partida)
+                            ? `S/ ${partidaSeleccionada.parcial_partida.toFixed(2)}`
+                            : '-'}
+                          disabled
+                          className="h-6 text-xs px-2 font-semibold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">Seleccione una partida desde "Presupuesto" para ver su APU</p>
+                )}
+              </div>
+              <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
+                <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[500px]">
+                  <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
+                    <tr>
+                      <th className="w-[80px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
+                        Código
+                      </th>
+                      <th className="w-auto px-2 py-1 text-left font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
+                        Descripción
+                      </th>
+                      <th className="w-[50px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
+                        Und
+                      </th>
+                      <th className="w-[85px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
+                        Cantidad
+                      </th>
+                      <th className="w-[70px] px-2 py-1 text-center font-semibold text-[var(--text-secondary)] uppercase tracking-wider border-r border-[var(--border-color)] text-xs">
+                        Precio
+                      </th>
+                      <th className="w-[80px] px-2 py-1 text-right font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-xs">
+                        Parcial
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-[var(--background)] divide-y divide-[var(--border-color)]">
+                    {isLoadingApu ? (
+                      <tr>
+                        <td colSpan={6} className="px-2 py-4 text-center text-xs text-[var(--text-secondary)]">
+                          <LoadingSpinner size={20} showText={false} />
+                          <span className="ml-2">Cargando APU...</span>
+                        </td>
+                      </tr>
+                    ) : datosAPUMeta.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-2 py-4 text-center text-xs text-[var(--text-secondary)]">
+                          {partidaSeleccionada 
+                            ? 'Esta partida no tiene APU asociado'
+                            : 'Seleccione una partida desde "Presupuesto" para ver su APU'}
+                        </td>
+                      </tr>
+                    ) : (
+                      datosAPUMeta.map((item, index) => (
+                        <tr key={index} className="hover:bg-[var(--hover-bg)] transition-colors">
+                          <td className="px-2 py-1 text-center border-r border-[var(--border-color)] text-xs">
+                            {item.codigo}
+                          </td>
+                          <td className="px-2 py-1 border-r border-[var(--border-color)] text-xs">
+                            {item.descripcion}
+                          </td>
+                          <td className="px-2 py-1 text-center border-r border-[var(--border-color)] text-xs">
+                            {item.unidad}
+                          </td>
+                          <td className="px-2 py-1 text-center border-r border-[var(--border-color)] text-xs">
+                            {item.cantidad.toFixed(2)}
+                          </td>
+                          <td className="px-2 py-1 text-center border-r border-[var(--border-color)] text-xs">
+                            {item.precio.toFixed(2)}
+                          </td>
+                          <td className="px-2 py-1 text-right text-xs">
+                            {item.parcial.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {datosAPUMeta.length > 0 && (
+                <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+                  <table className="w-full text-xs min-w-[500px]">
+                    <tfoot>
+                      <tr>
+                        <td className="w-[80px]"></td>
+                        <td className="w-auto"></td>
+                        <td className="w-[50px]"></td>
+                        <td className="w-[85px]"></td>
+                        <td className="w-[70px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
+                          Total APU:
+                        </td>
+                        <td className="w-[80px] px-2 py-2 text-right font-semibold text-[var(--text-primary)] text-xs">
+                          {totalAPU.toFixed(2)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Costo Real + Proyección */}
+        {tabActivo === 'costos' && (
+          <div className="h-full flex flex-col min-h-0">
+            <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
+              <div className="bg-blue-500/10 px-3 py-2 border-b border-[var(--border-color)] flex-shrink-0">
+                <h2 className="text-xs font-semibold text-[var(--text-primary)]">Costo Real + Proyección</h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Análisis de ejecución vs presupuestado</p>
+              </div>
+              <div className="overflow-y-auto overflow-x-auto flex-1 min-h-0">
+                <div className="min-w-0">
+                  <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[700px]">
+                    <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow">
+                      <tr>
+                        <th className="w-[80px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                          Código
+                        </th>
+                        <th className="w-auto px-1.5 py-1.5 text-left font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px]">
+                          Descripción
+                        </th>
+                        <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                          Requeremientos
+                        </th>
+                        <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                          OC Bienes
+                        </th>
+                        <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                          OC Servicios
+                        </th>
+                        <th className="w-[90px] px-1.5 py-1.5 text-center font-semibold text-[var(--text-secondary)]  tracking-wider border-r border-[var(--border-color)] text-[10px] whitespace-nowrap">
+                          Recep.
+                        </th>
+                        <th className="w-[100px] px-1.5 py-1.5 text-right font-semibold text-[var(--text-secondary)]  tracking-wider text-[10px] whitespace-nowrap">
+                          Dif.
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-[var(--background)] divide-y divide-[var(--border-color)]">
+                      {isLoadingTrazabilidad ? (
+                        <tr>
+                          <td colSpan={7} className="px-1.5 py-4 text-center text-xs text-[var(--text-secondary)]">
+                            <LoadingSpinner size={20} showText={false} />
+                            <span className="ml-2">Cargando datos de trazabilidad...</span>
+                          </td>
+                        </tr>
+                      ) : datosCostoReal.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-1.5 py-4 text-center text-xs text-[var(--text-secondary)]">
+                            {partidaSeleccionada 
+                              ? 'Esta partida no tiene datos de trazabilidad'
+                              : 'Seleccione una partida desde "Presupuesto" para ver los costos reales'}
+                          </td>
+                        </tr>
+                      ) : (
+                        datosCostoReal.map((item: any, index: number) => {
+                          const esRecursoAPU = recursosAPUSet.has(item.recurso_id) || recursosAPUSet.has(item.codigo);
+                          return (
+                        <tr 
+                          key={index} 
+                          className={`transition-colors cursor-pointer ${
+                            esRecursoAPU 
+                              ? 'bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 border-l-4 border-l-blue-500' 
+                              : 'hover:bg-[var(--hover-bg)]'
+                          }`}
+                          onClick={() => {
+                            setRecursoSeleccionado({
+                              recurso_id: item.recurso_id,
+                              codigo: item.codigo,
+                              descripcion: item.descripcion,
+                              totalRQ: item.totalRQ,
+                              totalOCBienes: item.totalOCBienes,
+                              totalOCServicios: item.totalOCServicios,
+                              totalRecepcion: item.totalRecepcion,
+                              diferencia: item.diferencia,
+                            });
+                          }}
+                        >
+                          <td className={`px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs font-mono whitespace-nowrap ${esRecursoAPU ? 'font-semibold' : ''}`}>
+                            {item.codigo}
+                          </td>
+                          <td className={`px-1.5 py-1.5 border-r border-[var(--border-color)] text-xs truncate max-w-[200px] ${esRecursoAPU ? 'font-semibold' : ''}`} title={item.descripcion}>
+                            {item.descripcion}
+                          </td>
+                          <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                            {item.totalRQ.toFixed(2)}
+                          </td>
+                          <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                            {item.totalOCBienes.toFixed(2)}
+                          </td>
+                          <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                            {item.totalOCServicios.toFixed(2)}
+                          </td>
+                          <td className="px-1.5 py-1.5 text-center border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                            {item.totalRecepcion.toFixed(2)}
+                          </td>
+                          <td className={`px-1.5 py-1.5 text-right text-xs whitespace-nowrap font-mono ${item.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {item.diferencia >= 0 ? '+' : ''}{item.diferencia.toFixed(2)}
+                          </td>
+                        </tr>
+                        );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="bg-[var(--card-bg)] border-t border-[var(--border-color)] flex-shrink-0 overflow-x-auto">
+                <table className="w-full divide-y divide-[var(--border-color)] text-xs min-w-[700px]">
+                  <tfoot>
+                    <tr>
+                      <td className="w-[80px]"></td>
+                      <td className="w-auto px-1.5 py-2 text-right font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs">
+                        Totales:
+                      </td>
+                      <td className="w-[90px] px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                        {totalesCostoReal.totalRQ.toFixed(2)}
+                      </td>
+                      <td className="w-[90px] px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                        {totalesCostoReal.totalOCBienes.toFixed(2)}
+                      </td>
+                      <td className="w-[90px] px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                        {totalesCostoReal.totalOCServicios.toFixed(2)}
+                      </td>
+                      <td className="w-[90px] px-1.5 py-2 text-center font-semibold text-[var(--text-primary)] border-r border-[var(--border-color)] text-xs whitespace-nowrap font-mono">
+                        {totalesCostoReal.totalRecepcion.toFixed(2)}
+                      </td>
+                      <td className={`w-[100px] px-1.5 py-2 text-right font-semibold text-xs whitespace-nowrap font-mono ${totalesCostoReal.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {totalesCostoReal.diferencia >= 0 ? '+' : ''}{totalesCostoReal.diferencia.toFixed(2)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal de trazabilidad detallada */}
