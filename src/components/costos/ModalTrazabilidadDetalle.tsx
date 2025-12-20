@@ -62,22 +62,25 @@ export default function ModalTrazabilidadDetalle({
       };
     }
 
-    const trazabilidad = trazabilidadDetalle.trazabilidades?.find(
+    // Filtrar todas las trazabilidades del mismo recurso (puede haber múltiples)
+    const trazabilidades = trazabilidadDetalle.trazabilidades?.filter(
       (t: any) => t.recurso_id === recurso.recurso_id
-    );
+    ) || [];
 
-    if (!trazabilidad || !trazabilidad.requerimientos_recurso || trazabilidad.requerimientos_recurso.length === 0) {
-      return {
-        codigo: recurso.codigo,
-        descripcion: recurso.descripcion,
-      };
+    // Buscar el primer requerimiento de cualquiera de las trazabilidades
+    for (const trazabilidad of trazabilidades) {
+      if (trazabilidad.requerimientos_recurso && trazabilidad.requerimientos_recurso.length > 0) {
+        const primerReq = trazabilidad.requerimientos_recurso[0];
+        return {
+          codigo: primerReq.codigo_recurso || recurso.codigo,
+          descripcion: primerReq.nombre_recurso || recurso.descripcion,
+        };
+      }
     }
 
-    // Obtener código y nombre del primer requerimiento (todos deberían tener los mismos datos del recurso)
-    const primerReq = trazabilidad.requerimientos_recurso[0];
     return {
-      codigo: primerReq.codigo_recurso || recurso.codigo,
-      descripcion: primerReq.nombre_recurso || recurso.descripcion,
+      codigo: recurso.codigo,
+      descripcion: recurso.descripcion,
     };
   }, [trazabilidadDetalle, recurso]);
 
@@ -95,11 +98,12 @@ export default function ModalTrazabilidadDetalle({
       };
     }
 
-    const trazabilidad = trazabilidadDetalle.trazabilidades?.find(
+    // Filtrar todas las trazabilidades del mismo recurso (puede haber múltiples)
+    const trazabilidades = trazabilidadDetalle.trazabilidades?.filter(
       (t: any) => t.recurso_id === recurso.recurso_id
-    );
+    ) || [];
 
-    if (!trazabilidad) {
+    if (trazabilidades.length === 0) {
       return {
         cantidadRequerida: 0,
         cantidadAprobada: 0,
@@ -111,31 +115,42 @@ export default function ModalTrazabilidadDetalle({
       };
     }
 
-    // Calcular cantidades desde requerimientos
-    const cantidadRequerida = trazabilidad.requerimientos_recurso?.reduce(
+    // Agrupar todos los requerimientos, órdenes de compra y transferencias de todas las trazabilidades
+    const todosRequerimientos = trazabilidades.flatMap(
+      (t: any) => t.requerimientos_recurso || []
+    );
+    const todasOrdenesCompra = trazabilidades.flatMap(
+      (t: any) => t.ordenes_compra_recurso || []
+    );
+    const todasTransferencias = trazabilidades.flatMap(
+      (t: any) => t.transferencias_recurso || []
+    );
+
+    // Calcular cantidades desde requerimientos (sumando todos)
+    const cantidadRequerida = todosRequerimientos.reduce(
       (sum: number, req: any) => sum + (req.cantidad || 0),
       0
-    ) || 0;
+    );
 
-    const cantidadAprobada = trazabilidad.requerimientos_recurso?.reduce(
+    const cantidadAprobada = todosRequerimientos.reduce(
       (sum: number, req: any) => sum + (req.cantidad_aprobada || 0),
       0
-    ) || 0;
+    );
 
-    const cantidadComprada = trazabilidad.ordenes_compra_recurso?.reduce(
+    const cantidadComprada = todasOrdenesCompra.reduce(
       (sum: number, oc: any) => sum + (oc.cantidad || 0),
       0
-    ) || 0;
+    );
 
-    const costoEstimado = trazabilidad.requerimientos_recurso?.reduce(
+    const costoEstimado = todosRequerimientos.reduce(
       (sum: number, req: any) => sum + ((req.cantidad_aprobada || 0) * (req.precio || 0)),
       0
-    ) || 0;
+    );
 
-    const costoReal = trazabilidad.transferencias_recurso?.reduce(
+    const costoReal = todasTransferencias.reduce(
       (sum: number, transf: any) => sum + ((transf.cantidad || 0) * (transf.costo || 0)),
       0
-    ) || 0;
+    );
 
     const porcentajeCompletado = cantidadRequerida > 0
       ? Math.min(100, (cantidadComprada / cantidadRequerida) * 100)
@@ -160,56 +175,63 @@ export default function ModalTrazabilidadDetalle({
   const transacciones = useMemo(() => {
     if (!trazabilidadDetalle) return [];
 
-    const trazabilidad = trazabilidadDetalle.trazabilidades?.find(
+    // Filtrar todas las trazabilidades del mismo recurso (puede haber múltiples)
+    const trazabilidades = trazabilidadDetalle.trazabilidades?.filter(
       (t: any) => t.recurso_id === recurso.recurso_id
-    );
+    ) || [];
 
-    if (!trazabilidad) return [];
+    if (trazabilidades.length === 0) return [];
 
     const transaccionesList: any[] = [];
 
-    // Agregar requerimientos
-    trazabilidad.requerimientos_recurso?.forEach((req: any) => {
-      transaccionesList.push({
-        tipo: 'Requerimiento',
-        codigo: req.requerimiento_data?.codigo || '-',
-        descripcion: req.requerimiento_data?.sustento || 'Sin descripción',
-        cantidad: req.cantidad_aprobada || req.cantidad || 0,
-        precio: req.precio || 0,
-        total: (req.cantidad_aprobada || req.cantidad || 0) * (req.precio || 0),
-        estado: req.requerimiento_data?.estado_atencion || req.estado || 'pendiente',
-        fecha: req.requerimiento_data?.fecha_solicitud || null,
-        color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+    // Agregar requerimientos de todas las trazabilidades
+    trazabilidades.forEach((trazabilidad: any) => {
+      trazabilidad.requerimientos_recurso?.forEach((req: any) => {
+        transaccionesList.push({
+          tipo: 'Requerimiento',
+          codigo: req.requerimiento_data?.codigo || '-',
+          descripcion: req.requerimiento_data?.sustento || 'Sin descripción',
+          cantidad: req.cantidad_aprobada || req.cantidad || 0,
+          precio: req.precio || 0,
+          total: (req.cantidad_aprobada || req.cantidad || 0) * (req.precio || 0),
+          estado: req.requerimiento_data?.estado_atencion || req.estado || 'pendiente',
+          fecha: req.requerimiento_data?.fecha_solicitud || null,
+          color: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+        });
       });
     });
 
-    // Agregar órdenes de compra
-    trazabilidad.ordenes_compra_recurso?.forEach((oc: any) => {
-      transaccionesList.push({
-        tipo: 'Orden de Compra',
-        codigo: oc.orden_compra_data?.codigo_orden || '-',
-        descripcion: oc.orden_compra_data?.descripcion || 'Sin descripción',
-        cantidad: oc.cantidad || 0,
-        precio: oc.costo_real || oc.costo_aproximado || 0,
-        total: (oc.cantidad || 0) * (oc.costo_real || oc.costo_aproximado || 0),
-        estado: oc.orden_compra_data?.estado || oc.estado || 'pendiente',
-        fecha: oc.orden_compra_data?.fecha_ini || null,
-        color: 'bg-green-500/10 text-green-600 dark:text-green-400',
+    // Agregar órdenes de compra de todas las trazabilidades
+    trazabilidades.forEach((trazabilidad: any) => {
+      trazabilidad.ordenes_compra_recurso?.forEach((oc: any) => {
+        transaccionesList.push({
+          tipo: 'Orden de Compra',
+          codigo: oc.orden_compra_data?.codigo_orden || '-',
+          descripcion: oc.orden_compra_data?.descripcion || 'Sin descripción',
+          cantidad: oc.cantidad || 0,
+          precio: oc.costo_real || oc.costo_aproximado || 0,
+          total: (oc.cantidad || 0) * (oc.costo_real || oc.costo_aproximado || 0),
+          estado: oc.orden_compra_data?.estado || oc.estado || 'pendiente',
+          fecha: oc.orden_compra_data?.fecha_ini || null,
+          color: 'bg-green-500/10 text-green-600 dark:text-green-400',
+        });
       });
     });
 
-    // Agregar transferencias
-    trazabilidad.transferencias_recurso?.forEach((transf: any) => {
-      transaccionesList.push({
-        tipo: 'Transferencia',
-        codigo: transf.transferencia_detalle_data?.referencia_codigo || '-',
-        descripcion: `Transferencia - ${transf.transferencia_detalle_data?.tipo || 'N/A'}`,
-        cantidad: transf.cantidad || 0,
-        precio: transf.costo || 0,
-        total: (transf.cantidad || 0) * (transf.costo || 0),
-        estado: transf.transferencia_detalle_data?.estado || '',
-        fecha: transf.transferencia_detalle_data?.fecha || null,
-        color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    // Agregar transferencias de todas las trazabilidades
+    trazabilidades.forEach((trazabilidad: any) => {
+      trazabilidad.transferencias_recurso?.forEach((transf: any) => {
+        transaccionesList.push({
+          tipo: 'Transferencia',
+          codigo: transf.transferencia_detalle_data?.referencia_codigo || '-',
+          descripcion: `Transferencia - ${transf.transferencia_detalle_data?.tipo || 'N/A'}`,
+          cantidad: transf.cantidad || 0,
+          precio: transf.costo || 0,
+          total: (transf.cantidad || 0) * (transf.costo || 0),
+          estado: transf.transferencia_detalle_data?.estado || '',
+          fecha: transf.transferencia_detalle_data?.fecha || null,
+          color: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        });
       });
     });
 
@@ -274,10 +296,20 @@ export default function ModalTrazabilidadDetalle({
               <div className="space-y-2 pr-1 flex-1 min-h-0">
                 {todosLosRecursos.map((r) => {
                 // Obtener información del recurso desde trazabilidadDetalle si está disponible
-                const trazabilidadRecurso = trazabilidadDetalle?.trazabilidades?.find(
+                // Filtrar todas las trazabilidades del mismo recurso (puede haber múltiples)
+                const trazabilidadesRecurso = trazabilidadDetalle?.trazabilidades?.filter(
                   (t: any) => t.recurso_id === r.recurso_id
-                );
-                const primerReq = trazabilidadRecurso?.requerimientos_recurso?.[0];
+                ) || [];
+                
+                // Buscar el primer requerimiento de cualquiera de las trazabilidades
+                let primerReq = null;
+                for (const trazabilidad of trazabilidadesRecurso) {
+                  if (trazabilidad.requerimientos_recurso && trazabilidad.requerimientos_recurso.length > 0) {
+                    primerReq = trazabilidad.requerimientos_recurso[0];
+                    break;
+                  }
+                }
+                
                 const codigoRecurso = primerReq?.codigo_recurso || r.codigo;
                 const descripcionRecurso = primerReq?.nombre_recurso || r.descripcion;
 
