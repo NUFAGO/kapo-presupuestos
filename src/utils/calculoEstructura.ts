@@ -100,7 +100,7 @@ function calcularPrecioRecurso(
  * Calcula la suma de parciales de Mano de Obra (para EQUIPO con %mo)
  * Misma lógica que DetallePartidaPanel.calcularSumaParcialesManoObra
  */
-function calcularSumaParcialesManoObra(
+export function calcularSumaParcialesManoObra(
   recursos: RecursoAPUCalculo[],
   rendimiento: number,
   jornada: number,

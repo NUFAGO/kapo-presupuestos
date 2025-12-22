@@ -72,4 +72,11 @@ export {
   useEspecialidad,
   type Especialidad,
 } from './useEspecialidades';
+export {
+  useResumenPresupuesto,
+  useHistoricoMensual,
+  type FiltrosResumen,
+  type ResumenPresupuesto,
+  type ResumenPresupuestoHistorico,
+} from './useResumenPresupuesto';
 

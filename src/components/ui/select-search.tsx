@@ -36,10 +36,21 @@ export function SelectSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Encontrar la opción seleccionada para mostrar su label
+  const selectedOption = React.useMemo(() => {
+    if (!value) return null;
+    return options.find(opt => opt.value === value);
+  }, [value, options]);
+
   // Sincronizar inputValue con value cuando cambia externamente
+  // Si hay una opción seleccionada, mostrar su label, sino el value
   useEffect(() => {
+    if (selectedOption) {
+      setInputValue(selectedOption.label);
+    } else {
     setInputValue(value || '');
-  }, [value]);
+    }
+  }, [value, selectedOption]);
 
   // Filtrar opciones según el texto del input
   const filteredOptions = React.useMemo(() => {
@@ -140,7 +151,8 @@ export function SelectSearch({
   };
 
   const handleSelectOption = (option: SelectSearchOption) => {
-    setInputValue(option.value);
+    // Establecer el label para mostrar el nombre, no el ID
+    setInputValue(option.label);
     onChange(option.value);
     setIsOpen(false);
     if (inputRef.current) {

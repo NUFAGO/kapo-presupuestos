@@ -12,20 +12,30 @@ interface ModalTrazabilidadDetalleProps {
     recurso_id: string;
     codigo: string;
     descripcion: string;
+    totalComposicion: number;
     totalRQ: number;
+    totalRQBruto: number;
     totalOCBienes: number;
+    totalOCBienesBruto: number;
     totalOCServicios: number;
+    totalOCServiciosBruto: number;
     totalRecepcion: number;
+    totalRecepcionBruto: number;
     diferencia: number;
   } | null;
   todosLosRecursos: Array<{
     recurso_id: string;
     codigo: string;
     descripcion: string;
+    totalComposicion: number;
     totalRQ: number;
+    totalRQBruto: number;
     totalOCBienes: number;
+    totalOCBienesBruto: number;
     totalOCServicios: number;
+    totalOCServiciosBruto: number;
     totalRecepcion: number;
+    totalRecepcionBruto: number;
     diferencia: number;
   }>; // Lista de todos los recursos de la tabla
   trazabilidadDetalle: any; // Datos detallados del monolito
@@ -34,10 +44,15 @@ interface ModalTrazabilidadDetalleProps {
     recurso_id: string;
     codigo: string;
     descripcion: string;
+    totalComposicion: number;
     totalRQ: number;
+    totalRQBruto: number;
     totalOCBienes: number;
+    totalOCBienesBruto: number;
     totalOCServicios: number;
+    totalOCServiciosBruto: number;
     totalRecepcion: number;
+    totalRecepcionBruto: number;
     diferencia: number;
   }) => void;
 }
@@ -325,8 +340,8 @@ export default function ModalTrazabilidadDetalle({
                   >
                     <div className="font-semibold truncate text-[var(--text-primary)]">{codigoRecurso}</div>
                     <div className="text-xs truncate mt-0.5 text-[var(--text-secondary)]">{descripcionRecurso}</div>
-                    <div className={`text-xs mt-1.5 font-semibold whitespace-nowrap ${r.diferencia >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {r.diferencia >= 0 ? '+' : ''}S/{r.diferencia.toFixed(2)}
+                    <div className={`text-xs mt-1.5 font-semibold whitespace-nowrap ${(r.diferencia || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {(r.diferencia || 0) >= 0 ? '+' : ''}S/{((r.diferencia || 0)).toFixed(2)}
                     </div>
                   </button>
                 );
@@ -346,20 +361,30 @@ export default function ModalTrazabilidadDetalle({
               <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                 <div className="text-right">
                   <div className="text-xs text-[var(--text-secondary)]">Total RQ</div>
-                  <div className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
-                    S/{recurso.totalRQ.toFixed(2)}
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
+                      S/{(recurso.totalRQ || 0).toFixed(2)}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-secondary)]">
+                      S/{((recurso.totalRQBruto || 0)).toFixed(2)}
+                    </span>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-[var(--text-secondary)]">Total OC</div>
-                  <div className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
-                    S/{(recurso.totalOCBienes + recurso.totalOCServicios).toFixed(2)}
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
+                      S/{((recurso.totalOCBienes || 0) + (recurso.totalOCServicios || 0)).toFixed(2)}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-secondary)]">
+                      S/{((recurso.totalOCBienesBruto || 0) + (recurso.totalOCServiciosBruto || 0)).toFixed(2)}
+                    </span>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-[var(--text-secondary)]">Diferencia</div>
-                  <div className={`font-semibold whitespace-nowrap ${recurso.diferencia >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {recurso.diferencia >= 0 ? '+' : ''}S/{recurso.diferencia.toFixed(2)}
+                  <div className={`font-semibold whitespace-nowrap ${(recurso.diferencia || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {(recurso.diferencia || 0) >= 0 ? '+' : ''}S/{((recurso.diferencia || 0)).toFixed(2)}
                   </div>
                 </div>
               </div>
