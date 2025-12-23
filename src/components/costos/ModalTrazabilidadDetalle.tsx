@@ -3,8 +3,9 @@
 import React, { useMemo, useState } from 'react';
 import Modal from '@/components/ui/modal';
 import { LoadingSpinner } from '@/components/ui';
-import { AlertTriangle, CheckCircle, Clock, Package, ShoppingCart, Truck } from 'lucide-react';
-import AnalisisEjecucionPresupuestado from './AnalisisEjecucionPresupuestado';
+import { AlertTriangle, CheckCircle, Clock, Package, ShoppingCart, Truck, Layers } from 'lucide-react';
+import { IconButton } from '@/components/ui';
+import AnalisisEjecucionPresupuestado, { AnalisisEjecucionPresupuestadoPartida } from './AnalisisEjecucionPresupuestado';
 
 interface ModalTrazabilidadDetalleProps {
   isOpen: boolean;
@@ -63,6 +64,11 @@ interface ModalTrazabilidadDetalleProps {
     totalRecepcionBruto: number;
     diferencia: number;
   }) => void;
+  abrirVistaPartidaDirectamente?: boolean; // Si true, abre directamente en vista de partida completa
+  partidaInfo?: {
+    item: string;
+    descripcion: string;
+  } | null; // Información de la partida para mostrar en el header cuando está en vista completa
 }
 
 export default function ModalTrazabilidadDetalle({
@@ -74,8 +80,38 @@ export default function ModalTrazabilidadDetalle({
   isLoading = false,
   onSeleccionarRecurso,
   recursoAPUMeta,
+  abrirVistaPartidaDirectamente = false,
+  partidaInfo,
 }: ModalTrazabilidadDetalleProps) {
   const [tabActivo, setTabActivo] = useState<'transacciones' | 'analisis'>('transacciones');
+  const [vistaPartida, setVistaPartida] = useState(false);
+
+  // Efecto para manejar la apertura directa en vista de partida
+  React.useEffect(() => {
+    if (isOpen && abrirVistaPartidaDirectamente) {
+      setVistaPartida(true);
+      setTabActivo('analisis'); // Cambiar al tab de análisis
+    } else if (isOpen && !abrirVistaPartidaDirectamente) {
+      // Si se abre sin el flag de vista partida, resetear a vista individual
+      setVistaPartida(false);
+      setTabActivo('transacciones');
+    }
+  }, [isOpen, abrirVistaPartidaDirectamente]);
+
+  // Efecto para resetear cuando se cierra el modal
+  React.useEffect(() => {
+    if (!isOpen) {
+      setVistaPartida(false);
+      setTabActivo('transacciones');
+    }
+  }, [isOpen]);
+
+  // Efecto para cambiar a vista individual cuando cambia el recurso seleccionado (desde el sidebar)
+  React.useEffect(() => {
+    if (isOpen && recurso && !abrirVistaPartidaDirectamente) {
+      setVistaPartida(false);
+    }
+  }, [recurso?.recurso_id, isOpen, abrirVistaPartidaDirectamente]);
 
   // Obtener información del recurso desde trazabilidadDetalle (datos del monolito)
   const recursoInfo = useMemo(() => {
@@ -306,10 +342,17 @@ export default function ModalTrazabilidadDetalle({
       isOpen={isOpen}
       onClose={onClose}
       title={
-        <div className="flex items-center gap-2">
-          <span className="text-purple-600 dark:text-purple-400">{recursoInfo.codigo}</span>
-          <span className="text-[var(--text-primary)] truncate max-w-md">{recursoInfo.descripcion}</span>
-        </div>
+        vistaPartida && partidaInfo ? (
+          <div className="flex items-center gap-2">
+            <span className="text-blue-600 dark:text-blue-400">Partida {partidaInfo.item}</span>
+            <span className="text-[var(--text-primary)] truncate max-w-md">{partidaInfo.descripcion}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-purple-600 dark:text-purple-400">{recursoInfo.codigo}</span>
+            <span className="text-[var(--text-primary)] truncate max-w-md">{recursoInfo.descripcion}</span>
+          </div>
+        )
       }
       size="xl"
     >
@@ -318,22 +361,56 @@ export default function ModalTrazabilidadDetalle({
           <LoadingSpinner size={40} />
           <span className="ml-3 text-sm text-[var(--text-secondary)]">Cargando detalles...</span>
         </div>
+      ) : vistaPartida ? (
+        /* Vista de análisis de toda la partida - Ocupa todo el espacio */
+        <div className="flex flex-col h-full min-h-0">
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-[var(--border-color)]">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+              Análisis de Ejecución vs Presupuestado - Toda la Partida
+            </h2>
+            <IconButton
+              icon={Layers}
+              variant="purple"
+              size="sm"
+              label="Detalle de Recursos"
+              title="Volver a vista de recurso individual"
+              onClick={() => setVistaPartida(false)}
+            />
+          </div>
+          <AnalisisEjecucionPresupuestadoPartida
+            todosLosRecursos={todosLosRecursos}
+            trazabilidadDetalle={trazabilidadDetalle}
+          />
+        </div>
       ) : (
         <div className="flex flex-col lg:flex-row gap-4 h-full min-h-0">
           {/* Panel lateral izquierdo - Lista de recursos */}
           <div className="w-full lg:w-56 flex-shrink-0 flex flex-col h-full min-h-0">
             <div className=" rounded-lg border p-3 flex flex-col h-full min-h-0">
-              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3 px-1 flex-shrink-0">
-                Recursos ({todosLosRecursos.length})
-              </h3>
-              <div className="space-y-2 pr-1 flex-1 min-h-0">
+              <div className="flex-shrink-0">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2 px-1">
+                  Recursos ({todosLosRecursos.length})
+                </h3>
+                <div className="mb-3">
+                  <IconButton
+                    icon={Layers}
+                    variant="purple"
+                    size="sm"
+                    label="Detalle Completo"
+                    title="Ver análisis agrupado por toda la partida"
+                    onClick={() => setVistaPartida(true)}
+                    className="w-full justify-center"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 pr-1 flex-1 min-h-0 overflow-y-auto">
                 {todosLosRecursos.map((r) => {
                 // Obtener información del recurso desde trazabilidadDetalle si está disponible
                 // Filtrar todas las trazabilidades del mismo recurso (puede haber múltiples)
                 const trazabilidadesRecurso = trazabilidadDetalle?.trazabilidades?.filter(
                   (t: any) => t.recurso_id === r.recurso_id
                 ) || [];
-                
+
                 // Buscar el primer requerimiento de cualquiera de las trazabilidades
                 let primerReq = null;
                 for (const trazabilidad of trazabilidadesRecurso) {
@@ -342,14 +419,17 @@ export default function ModalTrazabilidadDetalle({
                     break;
                   }
                 }
-                
+
                 const codigoRecurso = primerReq?.codigo_recurso || r.codigo;
                 const descripcionRecurso = primerReq?.nombre_recurso || r.descripcion;
 
                 return (
                   <button
                     key={r.recurso_id}
-                    onClick={() => onSeleccionarRecurso(r)}
+                    onClick={() => {
+                      onSeleccionarRecurso(r);
+                      setVistaPartida(false); // Cambiar a vista individual al seleccionar un recurso
+                    }}
                     className={`w-full text-left px-3 py-2.5 rounded-lg text-xs transition-all duration-200 ${
                       r.recurso_id === recurso.recurso_id
                         ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 font-semibold card-shadow'
@@ -370,43 +450,45 @@ export default function ModalTrazabilidadDetalle({
 
           {/* Contenido principal - Más compacto */}
           <div className="flex-1 flex flex-col min-w-0 space-y-2 min-h-0 ">
-            {/* Header con valores - Compacto */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm border-b border-[var(--border-color)] pb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[var(--text-secondary)]">Recurso:</span>
-                <span className="font-semibold text-[var(--text-primary)]">{recursoInfo.codigo}</span>
+            {/* Header con valores - Compacto - Solo mostrar si NO es vista partida */}
+            {!vistaPartida && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm border-b border-[var(--border-color)] pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[var(--text-secondary)]">Recurso:</span>
+                  <span className="font-semibold text-[var(--text-primary)]">{recursoInfo.codigo}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                  <div className="text-right">
+                    <div className="text-xs text-[var(--text-secondary)]">Total RQ</div>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
+                        S/{(recurso.totalRQ || 0).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-secondary)]">
+                        S/{((recurso.totalRQBruto || 0)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-[var(--text-secondary)]">Total OC</div>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
+                        S/{((recurso.totalOCBienes || 0) + (recurso.totalOCServicios || 0)).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-[var(--text-secondary)]">
+                        S/{((recurso.totalOCBienesBruto || 0) + (recurso.totalOCServiciosBruto || 0)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-[var(--text-secondary)]">Diferencia</div>
+                    <div className={`font-semibold whitespace-nowrap ${(recurso.diferencia || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {(recurso.diferencia || 0) >= 0 ? '+' : ''}S/{((recurso.diferencia || 0)).toFixed(2)}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                <div className="text-right">
-                  <div className="text-xs text-[var(--text-secondary)]">Total RQ</div>
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
-                      S/{(recurso.totalRQ || 0).toFixed(2)}
-                    </span>
-                    <span className="text-[10px] text-[var(--text-secondary)]">
-                      S/{((recurso.totalRQBruto || 0)).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-[var(--text-secondary)]">Total OC</div>
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-[var(--text-primary)] whitespace-nowrap">
-                      S/{((recurso.totalOCBienes || 0) + (recurso.totalOCServicios || 0)).toFixed(2)}
-                    </span>
-                    <span className="text-[10px] text-[var(--text-secondary)]">
-                      S/{((recurso.totalOCBienesBruto || 0) + (recurso.totalOCServiciosBruto || 0)).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-[var(--text-secondary)]">Diferencia</div>
-                  <div className={`font-semibold whitespace-nowrap ${(recurso.diferencia || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {(recurso.diferencia || 0) >= 0 ? '+' : ''}S/{((recurso.diferencia || 0)).toFixed(2)}
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Tarjetas de resumen - Más compactas */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -460,7 +542,7 @@ export default function ModalTrazabilidadDetalle({
                   </div>
                   <div>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                      estadisticas.estado === 'COMPLETADO' 
+                      estadisticas.estado === 'COMPLETADO'
                         ? 'bg-green-500/10 text-green-600 dark:text-green-400'
                         : estadisticas.estado === 'EN_PROCESO'
                         ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'

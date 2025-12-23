@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, ArrowLeft, Maximize2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { LoadingSpinner } from '@/components/ui';
 import { Input } from '@/components/ui/input';
 import { SearchInput, type SearchItem } from '@/components/ui/search-input';
+import { IconButton } from '@/components/ui/icon-button';
 import { useEstructuraPresupuesto } from '@/hooks/usePresupuestos';
 import { useApuByPartida } from '@/hooks/useAPU';
 import type { PartidaEstructura, TituloEstructura } from '@/hooks/usePresupuestos';
@@ -41,6 +42,7 @@ export default function EstructuraCostosResumen({
     totalRecepcionBruto: number;
     diferencia: number;
   } | null>(null);
+  const [abrirVistaPartida, setAbrirVistaPartida] = useState(false);
   const [tabActivo, setTabActivo] = useState<'presupuesto' | 'apu' | 'costos'>('presupuesto');
   const tableRef = useRef<HTMLDivElement>(null);
   const partidaRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
@@ -946,13 +948,32 @@ export default function EstructuraCostosResumen({
           {/* Costo Real + Proyección */}
           <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
             <div className="bg-blue-500/10 px-2 py-1 border-b border-[var(--border-color)] flex-shrink-0">
-              <h2 className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">Costo Real + Proyección</h2>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-tight">Análisis de ejecución vs presupuestado</p>
-              <p className="text-[9px] text-[var(--text-secondary)] opacity-75 leading-tight mt-0.5">
-                <span className="font-medium">Neto:</span> Pendiente/comprometido (no recibido) | 
-                <span className="font-medium"> Bruto:</span> Total comprometido | 
-                <span className="font-medium"> Recep.:</span> Real (recibido en almacén)
-              </p>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h2 className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">Costo Real + Proyección</h2>
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-tight">Análisis de ejecución vs presupuestado</p>
+                  <p className="text-[9px] text-[var(--text-secondary)] opacity-75 leading-tight mt-0.5">
+                    <span className="font-medium">Neto:</span> Pendiente/comprometido (no recibido) | 
+                    <span className="font-medium"> Bruto:</span> Total comprometido | 
+                    <span className="font-medium"> Recep.:</span> Real (recibido en almacén)
+                  </p>
+                </div>
+                <IconButton
+                  icon={Maximize2}
+                  variant="blue"
+                  size="sm"
+                  label="Detalle completo"
+                  title="Ver análisis detallado de toda la partida"
+                  className="!bg-blue-600/20 hover:!bg-blue-600/30 !text-blue-950 dark:!text-blue-600"
+                  onClick={() => {
+                    // Abrir modal con vista de partida completa
+                    if (datosCostoReal.length > 0) {
+                      setRecursoSeleccionado(datosCostoReal[0]); // Seleccionar cualquier recurso para activar el modal
+                      setAbrirVistaPartida(true); // Indicar que debe abrir la vista de partida
+                    }
+                  }}
+                />
+              </div>
             </div>
             <div className="overflow-y-auto overflow-x-auto flex-1 min-h-0">
               <div className="min-w-0">
@@ -1514,13 +1535,32 @@ export default function EstructuraCostosResumen({
           {/* Contenedor Costo Real + Proyección */}
           <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
             <div className="bg-blue-500/10 px-2 py-1 border-b border-[var(--border-color)] flex-shrink-0">
-              <h2 className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">Costo Real + Proyección</h2>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-tight">Análisis de ejecución vs presupuestado</p>
-              <p className="text-[9px] text-[var(--text-secondary)] opacity-75 leading-tight mt-0.5">
-                <span className="font-medium">Neto:</span> Pendiente/comprometido (no recibido) | 
-                <span className="font-medium"> Bruto:</span> Total comprometido | 
-                <span className="font-medium"> Recep.:</span> Real (recibido en almacén)
-              </p>
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h2 className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">Costo Real + Proyección</h2>
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-tight">Análisis de ejecución vs presupuestado</p>
+                  <p className="text-[9px] text-[var(--text-secondary)] opacity-75 leading-tight mt-0.5">
+                    <span className="font-medium">Neto:</span> Pendiente/comprometido (no recibido) | 
+                    <span className="font-medium"> Bruto:</span> Total comprometido | 
+                    <span className="font-medium"> Recep.:</span> Real (recibido en almacén)
+                  </p>
+                </div>
+                <IconButton
+                  icon={Maximize2}
+                  variant="blue"
+                  size="sm"
+                  label="Detalle completo"
+                  title="Ver análisis detallado de toda la partida"
+                  className="!bg-blue-600/20 hover:!bg-blue-600/30 !text-blue-950 dark:!text-blue-950"
+                  onClick={() => {
+                    // Abrir modal con vista de partida completa
+                    if (datosCostoReal.length > 0) {
+                      setRecursoSeleccionado(datosCostoReal[0]); // Seleccionar cualquier recurso para activar el modal
+                      setAbrirVistaPartida(true); // Indicar que debe abrir la vista de partida
+                    }
+                  }}
+                />
+              </div>
             </div>
             <div className="overflow-y-auto overflow-x-auto flex-1 min-h-0">
               <div className="min-w-0">
@@ -2075,8 +2115,27 @@ export default function EstructuraCostosResumen({
           <div className="h-full flex flex-col min-h-0">
             <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden flex flex-col flex-1 min-h-0">
               <div className="bg-blue-500/10 px-2 py-1 border-b border-[var(--border-color)] flex-shrink-0">
-                <h2 className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">Costo Real + Proyección</h2>
-                <p className="text-[11px] text-[var(--text-secondary)] leading-tight">Análisis de ejecución vs presupuestado</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h2 className="text-[11px] font-semibold text-[var(--text-primary)] leading-tight">Costo Real + Proyección</h2>
+                    <p className="text-[11px] text-[var(--text-secondary)] leading-tight">Análisis de ejecución vs presupuestado</p>
+                  </div>
+                  <IconButton
+                    icon={Maximize2}
+                    variant="blue"
+                    size="sm"
+                    label="Detalle completo"
+                    title="Ver análisis detallado de toda la partida"
+                    className="!bg-blue-600/20 hover:!bg-blue-600/30 !text-blue-950 dark:!text-blue-50"
+                    onClick={() => {
+                      // Abrir modal con vista de partida completa
+                      if (datosCostoReal.length > 0) {
+                        setRecursoSeleccionado(datosCostoReal[0]); // Seleccionar cualquier recurso para activar el modal
+                        setAbrirVistaPartida(true); // Indicar que debe abrir la vista de partida
+                      }
+                    }}
+                  />
+                </div>
               </div>
               <div className="overflow-y-auto overflow-x-auto flex-1 min-h-0">
                 <div className="min-w-0">
@@ -2262,15 +2321,24 @@ export default function EstructuraCostosResumen({
       {/* Modal de trazabilidad detallada */}
       <ModalTrazabilidadDetalle
         isOpen={!!recursoSeleccionado}
-        onClose={() => setRecursoSeleccionado(null)}
+        onClose={() => {
+          setRecursoSeleccionado(null);
+          setAbrirVistaPartida(false); // Resetear el estado al cerrar
+        }}
         recurso={recursoSeleccionado}
         todosLosRecursos={datosCostoReal}
         trazabilidadDetalle={trazabilidadDetalle}
         isLoading={isLoadingDetalle}
         onSeleccionarRecurso={(nuevoRecurso) => {
           setRecursoSeleccionado(nuevoRecurso);
+          setAbrirVistaPartida(false); // Al seleccionar un recurso individual, mostrar la vista normal
         }}
         recursoAPUMeta={recursoAPUMetaCalculado}
+        abrirVistaPartidaDirectamente={abrirVistaPartida}
+        partidaInfo={partidaSeleccionada ? {
+          item: calcularNumeroItem(partidaSeleccionada),
+          descripcion: partidaSeleccionada.descripcion,
+        } : null}
       />
     </div>
   );
