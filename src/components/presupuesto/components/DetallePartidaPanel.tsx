@@ -508,12 +508,9 @@ export default function DetallePartidaPanel({
               const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
               return roundToTwo(cantidadConDesperdicio * precio);
 
-            case 'MANO_OBRA': {
-              if (!nuevoRendimiento || nuevoRendimiento <= 0) return 0;
-              if (!nuevaJornada || nuevaJornada <= 0) return 0;
-              const cuadrillaValue = cuadrilla || 1;
-              return roundToTwo((1 / nuevoRendimiento) * nuevaJornada * cuadrillaValue * precio);
-            }
+            case 'MANO_OBRA':
+              // Para MANO_OBRA, si no es "hh", usar cálculo simple: cantidad * precio
+              return roundToTwo(cantidad * precio);
 
             case 'EQUIPO':
               return roundToTwo(cantidad * precio);
@@ -716,12 +713,9 @@ export default function DetallePartidaPanel({
         const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
         return roundToTwo(cantidadConDesperdicio * precio);
 
-      case 'MANO_OBRA': {
-        if (!rendimiento || rendimiento <= 0) return 0;
-        if (!jornada || jornada <= 0) return 0;
-        const cuadrillaValue = cuadrilla || 1;
-        return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
-      }
+      case 'MANO_OBRA':
+        // Para MANO_OBRA, si no es "hh", usar cálculo simple: cantidad * precio
+        return roundToTwo(cantidad * precio);
 
       case 'EQUIPO':
         return roundToTwo(cantidad * precio);
@@ -1052,6 +1046,7 @@ export default function DetallePartidaPanel({
                 const { tipo_recurso, cantidad, precio, cuadrilla, desperdicio_porcentaje, unidad_medida } = sr;
                 const unidadLower = unidad_medida?.toLowerCase() || '';
 
+                // PRIMERO: Verificar unidades especiales (independientemente del tipo_recurso)
                 if (unidadLower === '%mo') {
                   // Para %mo, calcular suma de HH
                   const sumaHH = recursosSubpartidaActualizados
@@ -1064,16 +1059,39 @@ export default function DetallePartidaPanel({
                       return suma;
                     }, 0);
                   parcialCalculado = roundToTwo(sumaHH * (cantidad / 100));
-                } else if (tipo_recurso === 'MATERIAL') {
-                  const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
-                  parcialCalculado = roundToTwo(cantidadConDesperdicio * (precio || 0));
-                } else if (tipo_recurso === 'MANO_OBRA' || (tipo_recurso === 'EQUIPO' && (unidadLower === 'hh' || unidadLower === 'hm'))) {
+                } else if (unidadLower === 'hh') {
+                  // Si tiene unidad "hh" (horas hombre), usar cálculo con cuadrilla
+                  if (rendimientoSub > 0 && jornadaSub > 0) {
+                    const cuadrillaValue = cuadrilla || 1;
+                    parcialCalculado = roundToTwo((1 / rendimientoSub) * jornadaSub * cuadrillaValue * (precio || 0));
+                  }
+                } else if (unidadLower === 'hm') {
+                  // Si tiene unidad "hm" (horas máquina), usar cálculo con cuadrilla
                   if (rendimientoSub > 0 && jornadaSub > 0) {
                     const cuadrillaValue = cuadrilla || 1;
                     parcialCalculado = roundToTwo((1 / rendimientoSub) * jornadaSub * cuadrillaValue * (precio || 0));
                   }
                 } else {
-                  parcialCalculado = roundToTwo(cantidad * (precio || 0));
+                  // Para otras unidades, usar lógica según tipo_recurso
+                  switch (tipo_recurso) {
+                    case 'MATERIAL':
+                      const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
+                      parcialCalculado = roundToTwo(cantidadConDesperdicio * (precio || 0));
+                      break;
+
+                    case 'MANO_OBRA':
+                      // Para MANO_OBRA, si no es "hh", usar cálculo simple: cantidad * precio
+                      parcialCalculado = roundToTwo(cantidad * (precio || 0));
+                      break;
+
+                    case 'EQUIPO':
+                    case 'SUBCONTRATO':
+                      parcialCalculado = roundToTwo(cantidad * (precio || 0));
+                      break;
+
+                    default:
+                      parcialCalculado = roundToTwo(cantidad * (precio || 0));
+                  }
                 }
 
                 return {
@@ -1136,35 +1154,41 @@ export default function DetallePartidaPanel({
           }
 
           const { tipo_recurso, cantidad, precio, cuadrilla, desperdicio_porcentaje, unidad_medida } = recurso;
+          const unidadMedidaLower = unidad_medida?.toLowerCase() || '';
 
+          // PRIMERO: Verificar unidades especiales (independientemente del tipo_recurso)
+          // Si tiene unidad "%mo", calcular basándose en la sumatoria de HH de recursos con unidad "hh"
+          if (unidadMedidaLower === '%mo') {
+            return roundToTwo(sumaHHManoObra * (cantidad / 100));
+          }
+
+          // Si tiene unidad "hh" (horas hombre), usar cálculo con cuadrilla
+          if (unidadMedidaLower === 'hh') {
+            if (!rendimiento || rendimiento <= 0) return 0;
+            if (!jornada || jornada <= 0) return 0;
+            const cuadrillaValue = cuadrilla || 1;
+            return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+          }
+
+          // Si tiene unidad "hm" (horas máquina), usar cálculo con cuadrilla
+          if (unidadMedidaLower === 'hm') {
+            if (!rendimiento || rendimiento <= 0) return 0;
+            if (!jornada || jornada <= 0) return 0;
+            const cuadrillaValue = cuadrilla || 1;
+            return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+          }
+
+          // Para otros casos, usar lógica según tipo_recurso
           switch (tipo_recurso) {
             case 'MATERIAL':
               const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
               return roundToTwo(cantidadConDesperdicio * precio);
 
-            case 'MANO_OBRA': {
-              if (!rendimiento || rendimiento <= 0) return 0;
-              if (!jornada || jornada <= 0) return 0;
-              const cuadrillaValue = cuadrilla || 1;
-              return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
-            }
+            case 'MANO_OBRA':
+              // Para MANO_OBRA, si no es "hh", usar cálculo simple: cantidad * precio
+              return roundToTwo(cantidad * precio);
 
             case 'EQUIPO':
-              // Si la unidad es "%mo", calcular basándose en la sumatoria de HH
-              if (unidad_medida === '%mo' || unidad_medida?.toLowerCase() === '%mo') {
-                // Usar la suma de HH ya calculada
-                return roundToTwo(sumaHHManoObra * (cantidad / 100));
-              }
-
-              // Si la unidad es "hm" (horas hombre), usar cálculo con cuadrilla
-              if (unidad_medida === 'hm' || unidad_medida?.toLowerCase() === 'hm') {
-                if (!rendimiento || rendimiento <= 0) return 0;
-                if (!jornada || jornada <= 0) return 0;
-                const cuadrillaValue = cuadrilla || 1;
-                return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
-              }
-
-              // Para otras unidades: cálculo simple cantidad × precio
               return roundToTwo(cantidad * precio);
 
             case 'SUBCONTRATO':
@@ -1443,52 +1467,55 @@ export default function DetallePartidaPanel({
 
                 let parcialCalculado = 0;
                 const { tipo_recurso, cantidad, precio, cuadrilla, desperdicio_porcentaje, unidad_medida } = sr;
+                const unidadLower = unidad_medida?.toLowerCase() || '';
 
-                switch (tipo_recurso) {
-                  case 'MATERIAL':
-                    const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
-                    parcialCalculado = roundToTwo(cantidadConDesperdicio * precio);
-                    break;
-
-                  case 'MANO_OBRA': {
-                    if (rendimientoSubpartida > 0 && jornadaSubpartida > 0) {
-                      const cuadrillaValue = cuadrilla || 1;
-                      parcialCalculado = roundToTwo((1 / rendimientoSubpartida) * jornadaSubpartida * cuadrillaValue * precio);
-                    }
-                    break;
-                  }
-
-                  case 'EQUIPO': {
-                    if (unidad_medida === '%mo' || unidad_medida?.toLowerCase() === '%mo') {
-                      // Para %mo, necesitamos calcular la suma de parciales de recursos con unidad "hh" de la subpartida
-                      const sumaHHManoObra = (subPartidaParaActualizar.recursos || [])
-                        .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
-                        .reduce((suma, r) => {
-                          if (rendimientoSubpartida > 0 && jornadaSubpartida > 0) {
-                            const cuadrillaValue = r.cuadrilla || 1;
-                            const parcialMO = (1 / rendimientoSubpartida) * jornadaSubpartida * cuadrillaValue * (r.precio || 0);
-                            return suma + parcialMO;
-                          }
-                          return suma;
-                        }, 0);
-                      parcialCalculado = roundToTwo(sumaHHManoObra * (cantidad / 100));
-                    } else if (unidad_medida === 'hm' || unidad_medida?.toLowerCase() === 'hm') {
+                // PRIMERO: Verificar unidades especiales (independientemente del tipo_recurso)
+                if (unidadLower === '%mo') {
+                  // Para %mo, necesitamos calcular la suma de parciales de recursos con unidad "hh" de la subpartida
+                  const sumaHHManoObra = (subPartidaParaActualizar.recursos || [])
+                    .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
+                    .reduce((suma, r) => {
                       if (rendimientoSubpartida > 0 && jornadaSubpartida > 0) {
-                        const cuadrillaValue = cuadrilla || 1;
-                        parcialCalculado = roundToTwo((1 / rendimientoSubpartida) * jornadaSubpartida * cuadrillaValue * precio);
+                        const cuadrillaValue = r.cuadrilla || 1;
+                        const parcialMO = (1 / rendimientoSubpartida) * jornadaSubpartida * cuadrillaValue * (r.precio || 0);
+                        return suma + parcialMO;
                       }
-                    } else {
-                      parcialCalculado = roundToTwo(cantidad * precio);
-                    }
-                    break;
+                      return suma;
+                    }, 0);
+                  parcialCalculado = roundToTwo(sumaHHManoObra * (cantidad / 100));
+                } else if (unidadLower === 'hh') {
+                  // Si tiene unidad "hh" (horas hombre), usar cálculo con cuadrilla
+                  if (rendimientoSubpartida > 0 && jornadaSubpartida > 0) {
+                    const cuadrillaValue = cuadrilla || 1;
+                    parcialCalculado = roundToTwo((1 / rendimientoSubpartida) * jornadaSubpartida * cuadrillaValue * precio);
                   }
+                } else if (unidadLower === 'hm') {
+                  // Si tiene unidad "hm" (horas máquina), usar cálculo con cuadrilla
+                  if (rendimientoSubpartida > 0 && jornadaSubpartida > 0) {
+                    const cuadrillaValue = cuadrilla || 1;
+                    parcialCalculado = roundToTwo((1 / rendimientoSubpartida) * jornadaSubpartida * cuadrillaValue * precio);
+                  }
+                } else {
+                  // Para otras unidades, usar lógica según tipo_recurso
+                  switch (tipo_recurso) {
+                    case 'MATERIAL':
+                      const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
+                      parcialCalculado = roundToTwo(cantidadConDesperdicio * precio);
+                      break;
 
-                  case 'SUBCONTRATO':
-                    parcialCalculado = roundToTwo(cantidad * precio);
-                    break;
+                    case 'MANO_OBRA':
+                      // Para MANO_OBRA, si no es "hh", usar cálculo simple: cantidad * precio
+                      parcialCalculado = roundToTwo(cantidad * precio);
+                      break;
 
-                  default:
-                    parcialCalculado = roundToTwo(cantidad * precio);
+                    case 'EQUIPO':
+                    case 'SUBCONTRATO':
+                      parcialCalculado = roundToTwo(cantidad * precio);
+                      break;
+
+                    default:
+                      parcialCalculado = roundToTwo(cantidad * precio);
+                  }
                 }
 
                 return {

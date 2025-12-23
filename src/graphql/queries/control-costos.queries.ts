@@ -36,6 +36,7 @@ export const GET_TRAZABILIDAD_DETALLE_PARTIDA_QUERY = `
         recurso_id
         requerimientos_recurso {
           id
+          requerimiento_recurso_id
           requerimiento_id
           recurso_id
           cantidad
@@ -56,6 +57,7 @@ export const GET_TRAZABILIDAD_DETALLE_PARTIDA_QUERY = `
         ordenes_compra_recurso {
           id
           orden_compra_id
+          requerimiento_recurso_id
           cantidad
           costo_real
           costo_aproximado
@@ -71,6 +73,7 @@ export const GET_TRAZABILIDAD_DETALLE_PARTIDA_QUERY = `
         transferencias_recurso {
           id
           transferencia_detalle_id
+          requerimiento_recurso_id
           recurso_id
           cantidad
           costo
@@ -79,6 +82,7 @@ export const GET_TRAZABILIDAD_DETALLE_PARTIDA_QUERY = `
             tipo
             estado
             fecha
+            referencia_id
             referencia_codigo
           }
         }

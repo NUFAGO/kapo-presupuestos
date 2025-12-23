@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Modal from '@/components/ui/modal';
 import { LoadingSpinner } from '@/components/ui';
 import { AlertTriangle, CheckCircle, Clock, Package, ShoppingCart, Truck } from 'lucide-react';
+import AnalisisEjecucionPresupuestado from './AnalisisEjecucionPresupuestado';
 
 interface ModalTrazabilidadDetalleProps {
   isOpen: boolean;
@@ -22,6 +23,13 @@ interface ModalTrazabilidadDetalleProps {
     totalRecepcion: number;
     totalRecepcionBruto: number;
     diferencia: number;
+  } | null;
+  // Datos del recurso del APU meta (si existe)
+  recursoAPUMeta?: {
+    cantidad: number;
+    precio: number;
+    parcial: number;
+    unidad: string;
   } | null;
   todosLosRecursos: Array<{
     recurso_id: string;
@@ -65,11 +73,18 @@ export default function ModalTrazabilidadDetalle({
   trazabilidadDetalle,
   isLoading = false,
   onSeleccionarRecurso,
+  recursoAPUMeta,
 }: ModalTrazabilidadDetalleProps) {
-  if (!recurso) return null;
+  const [tabActivo, setTabActivo] = useState<'transacciones' | 'analisis'>('transacciones');
 
   // Obtener información del recurso desde trazabilidadDetalle (datos del monolito)
   const recursoInfo = useMemo(() => {
+    if (!recurso) {
+      return {
+        codigo: '',
+        descripcion: '',
+      };
+    }
     if (!trazabilidadDetalle) {
       return {
         codigo: recurso.codigo,
@@ -94,14 +109,14 @@ export default function ModalTrazabilidadDetalle({
     }
 
     return {
-      codigo: recurso.codigo,
-      descripcion: recurso.descripcion,
+      codigo: recurso?.codigo || '',
+      descripcion: recurso?.descripcion || '',
     };
   }, [trazabilidadDetalle, recurso]);
 
   // Calcular estadísticas
   const estadisticas = useMemo(() => {
-    if (!trazabilidadDetalle) {
+    if (!recurso || !trazabilidadDetalle) {
       return {
         cantidadRequerida: 0,
         cantidadAprobada: 0,
@@ -188,7 +203,7 @@ export default function ModalTrazabilidadDetalle({
 
   // Obtener transacciones detalladas
   const transacciones = useMemo(() => {
-    if (!trazabilidadDetalle) return [];
+    if (!recurso || !trazabilidadDetalle) return [];
 
     // Filtrar todas las trazabilidades del mismo recurso (puede haber múltiples)
     const trazabilidades = trazabilidadDetalle.trazabilidades?.filter(
@@ -258,6 +273,9 @@ export default function ModalTrazabilidadDetalle({
       return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
     });
   }, [trazabilidadDetalle, recurso]);
+
+  // Early return después de todos los hooks
+  if (!recurso) return null;
 
   const getEstadoColor = (estado: string) => {
     const estadoLower = estado.toLowerCase();
@@ -475,71 +493,101 @@ export default function ModalTrazabilidadDetalle({
               </div>
             </div>
 
-            {/* Tabla de transacciones - Más compacta */}
+            {/* Tabs y contenido */}
             <div className="border border-[var(--border-color)] rounded overflow-hidden flex flex-col flex-1 min-h-0">
-              <div className="bg-[var(--card-bg)] px-4 py-2 border-b border-[var(--border-color)] flex-shrink-0">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-                  Transacciones Detalladas
-                </h3>
+              {/* Tabs */}
+              <div className="bg-[var(--card-bg)] border-b border-[var(--border-color)] flex-shrink-0">
+                <div className="flex">
+                  <button
+                    onClick={() => setTabActivo('transacciones')}
+                    className={`flex-1 px-4 py-2 text-sm font-semibold transition-colors ${
+                      tabActivo === 'transacciones'
+                        ? 'bg-[var(--background)] text-[var(--text-primary)] border-b-2 border-purple-500'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]'
+                    }`}
+                  >
+                    Transacciones Detalladas
+                  </button>
+                  <button
+                    onClick={() => setTabActivo('analisis')}
+                    className={`flex-1 px-4 py-2 text-sm font-semibold transition-colors ${
+                      tabActivo === 'analisis'
+                        ? 'bg-[var(--background)] text-[var(--text-primary)] border-b-2 border-purple-500'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover-bg)]'
+                    }`}
+                  >
+                    Análisis de Ejecución vs Presupuestado
+                  </button>
+                </div>
               </div>
-              <div className="overflow-x-auto flex-1 min-h-0" style={{ overflowY: 'auto' }}>
-                <table className="w-full text-xs min-w-[800px]">
-                  <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow border-b border-[var(--border-color)]">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)]">Tipo</th>
-                      <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)]">Código</th>
-                      <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)]">Descripción</th>
-                      <th className="px-3 py-2 text-right font-semibold text-[var(--text-secondary)]">Cant.</th>
-                      <th className="px-3 py-2 text-right font-semibold text-[var(--text-secondary)]">Precio</th>
-                      <th className="px-3 py-2 text-right font-semibold text-[var(--text-secondary)]">Total</th>
-                      <th className="px-3 py-2 text-center font-semibold text-[var(--text-secondary)]">Estado</th>
-                      <th className="px-3 py-2 text-center font-semibold text-[var(--text-secondary)]">Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border-color)]">
-                    {transacciones.length === 0 ? (
+
+              {/* Contenido según tab activo */}
+              {tabActivo === 'transacciones' ? (
+                <div className="overflow-x-auto flex-1 min-h-0" style={{ overflowY: 'auto' }}>
+                  <table className="w-full text-xs min-w-[800px]">
+                    <thead className="sticky top-0 bg-[var(--card-bg)] z-10 table-header-shadow border-b border-[var(--border-color)]">
                       <tr>
-                        <td colSpan={8} className="px-3 py-8 text-center text-[var(--text-secondary)]">
-                          No hay transacciones disponibles
-                        </td>
+                        <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)]">Tipo</th>
+                        <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)]">Código</th>
+                        <th className="px-3 py-2 text-left font-semibold text-[var(--text-secondary)]">Descripción</th>
+                        <th className="px-3 py-2 text-right font-semibold text-[var(--text-secondary)]">Cant.</th>
+                        <th className="px-3 py-2 text-right font-semibold text-[var(--text-secondary)]">Precio</th>
+                        <th className="px-3 py-2 text-right font-semibold text-[var(--text-secondary)]">Total</th>
+                        <th className="px-3 py-2 text-center font-semibold text-[var(--text-secondary)]">Estado</th>
+                        <th className="px-3 py-2 text-center font-semibold text-[var(--text-secondary)]">Fecha</th>
                       </tr>
-                    ) : (
-                      transacciones.map((trans, index) => (
-                        <tr key={index} className="hover:bg-[var(--hover-bg)]">
-                          <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${trans.color} whitespace-nowrap`}>
-                              {trans.tipo}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 font-medium text-[var(--text-primary)]">
-                            {trans.codigo}
-                          </td>
-                          <td className="px-3 py-2 text-[var(--text-secondary)] max-w-[150px] truncate" title={trans.descripcion}>
-                            {trans.descripcion}
-                          </td>
-                          <td className="px-3 py-2 text-right text-[var(--text-primary)]">
-                            {trans.cantidad.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-2 text-right text-[var(--text-primary)] whitespace-nowrap">
-                            S/{trans.precio.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold text-[var(--text-primary)] whitespace-nowrap">
-                            S/{trans.total.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(trans.estado)} whitespace-nowrap`}>
-                              {trans.estado}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-center text-[var(--text-secondary)]">
-                            {formatDate(trans.fecha)}
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-color)]">
+                      {transacciones.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-3 py-8 text-center text-[var(--text-secondary)]">
+                            No hay transacciones disponibles
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      ) : (
+                        transacciones.map((trans, index) => (
+                          <tr key={index} className="hover:bg-[var(--hover-bg)]">
+                            <td className="px-3 py-2">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${trans.color} whitespace-nowrap`}>
+                                {trans.tipo}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 font-medium text-[var(--text-primary)]">
+                              {trans.codigo}
+                            </td>
+                            <td className="px-3 py-2 text-[var(--text-secondary)] max-w-[150px] truncate" title={trans.descripcion}>
+                              {trans.descripcion}
+                            </td>
+                            <td className="px-3 py-2 text-right text-[var(--text-primary)]">
+                              {trans.cantidad.toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-[var(--text-primary)] whitespace-nowrap">
+                              S/{trans.precio.toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2 text-right font-semibold text-[var(--text-primary)] whitespace-nowrap">
+                              S/{trans.total.toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(trans.estado)} whitespace-nowrap`}>
+                                {trans.estado}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-center text-[var(--text-secondary)]">
+                              {formatDate(trans.fecha)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <AnalisisEjecucionPresupuestado
+                  recurso={recurso}
+                  trazabilidadDetalle={trazabilidadDetalle}
+                  recursoAPUMeta={recursoAPUMeta}
+                />
+              )}
             </div>
           </div>
         </div>

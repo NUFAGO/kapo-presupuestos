@@ -557,30 +557,42 @@ export default function ModalAgregarSubPartida({
   const calcularParcial = (recurso: RecursoAPUEditable): number => {
     const { tipo_recurso, cantidad, precio, cuadrilla, desperdicio_porcentaje, unidad_medida } =
       recurso;
+    const unidadMedidaLower = unidad_medida?.toLowerCase() || '';
 
+    // PRIMERO: Verificar unidades especiales (independientemente del tipo_recurso)
+    // Si tiene unidad "%mo", calcular basándose en la sumatoria de HH de recursos con unidad "hh"
+    if (unidadMedidaLower === '%mo') {
+      const sumaHHManoObra = calcularSumaParcialesManoObra();
+      return roundToTwo(sumaHHManoObra * (cantidad / 100));
+    }
+
+    // Si tiene unidad "hh" (horas hombre), usar cálculo con cuadrilla
+    if (unidadMedidaLower === 'hh') {
+      if (!rendimiento || rendimiento <= 0) return 0;
+      if (!jornada || jornada <= 0) return 0;
+      const cuadrillaValue = cuadrilla || 1;
+      return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+    }
+
+    // Si tiene unidad "hm" (horas máquina), usar cálculo con cuadrilla
+    if (unidadMedidaLower === 'hm') {
+      if (!rendimiento || rendimiento <= 0) return 0;
+      if (!jornada || jornada <= 0) return 0;
+      const cuadrillaValue = cuadrilla || 1;
+      return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
+    }
+
+    // Para otros casos, usar lógica según tipo_recurso
     switch (tipo_recurso) {
       case 'MATERIAL':
         const cantidadConDesperdicio = cantidad * (1 + (desperdicio_porcentaje || 0) / 100);
         return roundToTwo(cantidadConDesperdicio * precio);
 
-      case 'MANO_OBRA': {
-        if (!rendimiento || rendimiento <= 0) return 0;
-        if (!jornada || jornada <= 0) return 0;
-        const cuadrillaValue = cuadrilla || 1;
-        return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
-      }
+      case 'MANO_OBRA':
+        // Para MANO_OBRA, si no es "hh", usar cálculo simple: cantidad * precio
+        return roundToTwo(cantidad * precio);
 
       case 'EQUIPO':
-        if (unidad_medida === '%mo' || unidad_medida?.toLowerCase() === '%mo') {
-          const sumaHHManoObra = calcularSumaParcialesManoObra();
-          return roundToTwo(sumaHHManoObra * (cantidad / 100));
-        }
-        if (unidad_medida === 'hm' || unidad_medida?.toLowerCase() === 'hm') {
-          if (!rendimiento || rendimiento <= 0) return 0;
-          if (!jornada || jornada <= 0) return 0;
-          const cuadrillaValue = cuadrilla || 1;
-          return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
-        }
         return roundToTwo(cantidad * precio);
 
       case 'SUBCONTRATO':

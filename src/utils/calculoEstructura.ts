@@ -80,12 +80,19 @@ function calcularPrecioRecurso(
     const desperdicio = recurso.desperdicio_porcentaje || 0;
     const cantidadConDesperdicio = cantidad * (1 + desperdicio / 100);
 
-    if (tipoRecurso === 'MANO_OBRA' && rendimiento > 0 && jornada > 0) {
+    // Para MANO_OBRA, solo usar fórmula con cuadrilla si la unidad es "hh"
+    const unidadMedidaLower = recurso.unidad_medida?.toLowerCase() || '';
+    if (tipoRecurso === 'MANO_OBRA' && unidadMedidaLower === 'hh' && rendimiento > 0 && jornada > 0) {
       // Despejar precio desde parcial: Precio = Parcial / ((1 / Rendimiento) × Jornada × Cuadrilla)
       const cuadrillaValue = recurso.cuadrilla || 1;
       const divisor = (1 / rendimiento) * jornada * cuadrillaValue;
       if (divisor > 0) {
         return recurso.parcial / divisor;
+      }
+    } else if (tipoRecurso === 'MANO_OBRA') {
+      // Para MANO_OBRA con otras unidades, usar cantidad directamente (sin desperdicio)
+      if (cantidad > 0) {
+        return recurso.parcial / cantidad;
       }
     } else if (cantidadConDesperdicio > 0) {
       return recurso.parcial / cantidadConDesperdicio;
@@ -191,12 +198,9 @@ export function calcularParcialRecurso(
       return roundToTwo(cantidadConDesperdicio * precio);
     }
 
-    case 'MANO_OBRA': {
-      if (!rendimiento || rendimiento <= 0) return 0;
-      if (!jornada || jornada <= 0) return 0;
-      const cuadrillaValue = recurso.cuadrilla || 1;
-      return roundToTwo((1 / rendimiento) * jornada * cuadrillaValue * precio);
-    }
+    case 'MANO_OBRA':
+      // Para MANO_OBRA, si no es "hh", usar cálculo simple: cantidad * precio
+      return roundToTwo(recurso.cantidad * precio);
 
     case 'EQUIPO':
       return roundToTwo(recurso.cantidad * precio);

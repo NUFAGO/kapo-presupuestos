@@ -236,12 +236,19 @@ export default function EstructuraCostosResumen({
       const desperdicio = recurso.desperdicio_porcentaje || 0;
       const cantidadConDesperdicio = cantidad * (1 + desperdicio / 100);
 
-      if (tipoRecurso === 'MANO_OBRA' && rendimiento > 0 && jornada > 0) {
+      // Para MANO_OBRA, solo usar fórmula con cuadrilla si la unidad es "hh"
+      const unidadMedidaLower = recurso.unidad_medida?.toLowerCase() || '';
+      if (tipoRecurso === 'MANO_OBRA' && unidadMedidaLower === 'hh' && rendimiento > 0 && jornada > 0) {
         // Despejar precio desde parcial: Precio = Parcial / ((1 / Rendimiento) × Jornada × Cuadrilla)
         const cuadrillaValue = recurso.cuadrilla || 1;
         const divisor = (1 / rendimiento) * jornada * cuadrillaValue;
         if (divisor > 0) {
           return recurso.parcial / divisor;
+        }
+      } else if (tipoRecurso === 'MANO_OBRA') {
+        // Para MANO_OBRA con otras unidades, usar cantidad directamente (sin desperdicio)
+        if (cantidad > 0) {
+          return recurso.parcial / cantidad;
         }
       } else if (cantidadConDesperdicio > 0) {
         return recurso.parcial / cantidadConDesperdicio;
@@ -305,6 +312,7 @@ export default function EstructuraCostosResumen({
         (recurso.tipo_recurso === 'EQUIPO' && unidadMedidaLower === 'hm');
 
       return {
+        recurso_id: recurso.recurso_id || undefined,
         codigo: recurso.codigo_recurso || '-',
         descripcion: recurso.descripcion || '-',
         unidad: recurso.unidad_medida || '-',
@@ -405,6 +413,29 @@ export default function EstructuraCostosResumen({
         return sum + (isNaN(parcial) ? 0 : parcial);
       }, 0);
   }, [partidasOrdenadas]);
+
+  // Calcular recursoAPUMeta para el modal
+  const recursoAPUMetaCalculado = useMemo(() => {
+    if (!recursoSeleccionado) return null;
+    
+    // Buscar el recurso en datosAPUMeta por código o recurso_id
+    const recursoEnAPU = datosAPUMeta.find(
+      (item: any) => 
+        item.codigo === recursoSeleccionado.codigo ||
+        (recursoSeleccionado.recurso_id && item.recurso_id === recursoSeleccionado.recurso_id)
+    );
+    
+    if (recursoEnAPU) {
+      return {
+        cantidad: recursoEnAPU.cantidad || 0,
+        precio: recursoEnAPU.precio || 0,
+        parcial: recursoEnAPU.parcial || 0,
+        unidad: recursoEnAPU.unidad || '',
+      };
+    }
+    
+    return null;
+  }, [recursoSeleccionado, datosAPUMeta]);
 
   // Función de búsqueda para SearchInput
   const buscarPartidas = useCallback(async (query: string): Promise<SearchItem[]> => {
@@ -870,7 +901,12 @@ export default function EstructuraCostosResumen({
                           <span className="text-xs text-[var(--text-secondary)]">{item.cuadrilla !== undefined ? item.cuadrilla.toFixed(4) : ''}</span>
                         </td>
                         <td className="px-1.5 py-1 text-center border-r border-[var(--border-color)] text-xs">
-                          <span className="text-xs text-[var(--text-secondary)]">{item.cantidad.toFixed(2)}</span>
+                          <span className="text-xs text-[var(--text-secondary)]">
+                            {item.cantidad.toFixed(2)}
+                            {(item.unidad === '%mo' || item.unidad?.toLowerCase() === '%mo') && (
+                              <span className="text-xs text-[var(--text-secondary)] ml-0.5">%</span>
+                            )}
+                          </span>
                         </td>
                         <td className="px-1.5 py-1 text-center border-r border-[var(--border-color)] text-xs">
                           <span className="text-xs text-[var(--text-secondary)]">{item.precio.toFixed(2)}</span>
@@ -1432,7 +1468,12 @@ export default function EstructuraCostosResumen({
                           <span className="text-xs text-[var(--text-secondary)]">{item.cuadrilla !== undefined ? item.cuadrilla.toFixed(4) : ''}</span>
                         </td>
                         <td className="px-2 py-1 text-center border-r border-[var(--border-color)] text-xs">
-                          <span className="text-xs text-[var(--text-secondary)]">{item.cantidad.toFixed(2)}</span>
+                          <span className="text-xs text-[var(--text-secondary)]">
+                            {item.cantidad.toFixed(2)}
+                            {(item.unidad === '%mo' || item.unidad?.toLowerCase() === '%mo') && (
+                              <span className="text-xs text-[var(--text-secondary)] ml-0.5">%</span>
+                            )}
+                          </span>
                         </td>
                         <td className="px-2 py-1 text-center border-r border-[var(--border-color)] text-xs">
                           <span className="text-xs text-[var(--text-secondary)]">{item.precio.toFixed(2)}</span>
@@ -2229,6 +2270,7 @@ export default function EstructuraCostosResumen({
         onSeleccionarRecurso={(nuevoRecurso) => {
           setRecursoSeleccionado(nuevoRecurso);
         }}
+        recursoAPUMeta={recursoAPUMetaCalculado}
       />
     </div>
   );

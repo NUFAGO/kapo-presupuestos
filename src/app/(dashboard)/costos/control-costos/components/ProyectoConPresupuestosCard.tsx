@@ -90,7 +90,8 @@ export default function ProyectoConPresupuestosCard({ proyecto }: ProyectoConPre
             {presupuestos.map((presupuesto, index) => (
               <div
                 key={presupuesto.id_presupuesto}
-                className="group px-2.5 py-1.5 rounded bg-[var(--background)] card-shadow hover:shadow-md transition-all"
+                onClick={() => handlePresupuestoClick(presupuesto)}
+                className="group px-2.5 py-1.5 rounded bg-[var(--background)] card-shadow hover:shadow-md transition-all cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
                   {/* Número de enumeración */}
@@ -134,14 +135,10 @@ export default function ProyectoConPresupuestosCard({ proyecto }: ProyectoConPre
                     </span>
                   )}
                   
-                  {/* Botón/Flecha clickeable */}
-                  <button
-                    onClick={() => handlePresupuestoClick(presupuesto)}
-                    className="p-0.5 rounded hover:bg-[var(--card-bg)]/60 transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
-                    title="Ver resumen de costos"
-                  >
-                    <ArrowRight className="h-3 w-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
-                  </button>
+                  {/* Flecha indicadora */}
+                  <div className="p-0.5 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+                    <ArrowRight className="h-3 w-3 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]" />
+                  </div>
                 </div>
               </div>
             ))}
