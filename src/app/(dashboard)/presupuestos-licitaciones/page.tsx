@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, X, Building2, FileText, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SelectSearch } from '@/components/ui/select-search';
 import { LoadingSpinner } from '@/components/ui';
 import { usePresupuestosPorFase } from '@/hooks/usePresupuestos';
 import { useProyectos } from '@/hooks';
@@ -30,10 +31,8 @@ function PresupuestosLicitacionesContent() {
   const {
     searchQuery,
     filtroProyecto,
-    filtroPresupuesto,
     setSearchQuery,
     setFiltroProyecto,
-    setFiltroPresupuesto,
     clearFilters,
   } = usePageState('licitaciones');
 
@@ -47,6 +46,14 @@ function PresupuestosLicitacionesContent() {
     },
   });
   const proyectos = proyectosData?.data || [];
+
+  // Preparar opciones para SelectSearch de proyectos
+  const opcionesProyectos = useMemo(() => {
+    return proyectos.map(proyecto => ({
+      value: proyecto.id_proyecto,
+      label: proyecto.nombre_proyecto,
+    }));
+  }, [proyectos]);
 
   // Obtener presupuestos en fase LICITACION (incluye padres y versiones)
   const id_proyecto_filtrado = filtroProyecto || null;
@@ -117,7 +124,7 @@ function PresupuestosLicitacionesContent() {
     let filtrados = proyectosConPresupuestos.map((proyectoConPresupuestos) => {
       let gruposFiltrados = [...proyectoConPresupuestos.gruposPresupuestos];
 
-    // Filtro por búsqueda general (nombre de presupuesto o ID)
+    // Filtro por búsqueda general (nombre de presupuesto, proyecto o ID)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
         gruposFiltrados = gruposFiltrados.filter(
@@ -133,16 +140,6 @@ function PresupuestosLicitacionesContent() {
       );
     }
 
-    // Filtro por ID de presupuesto específico
-    if (filtroPresupuesto.trim()) {
-      const query = filtroPresupuesto.toLowerCase().trim();
-        gruposFiltrados = gruposFiltrados.filter(
-        (grupo) =>
-          grupo.presupuestoPadre.id_presupuesto.toLowerCase().includes(query) ||
-          grupo.versiones.some((v) => v.id_presupuesto.toLowerCase().includes(query))
-      );
-    }
-
       return {
         ...proyectoConPresupuestos,
         gruposPresupuestos: gruposFiltrados,
@@ -153,7 +150,7 @@ function PresupuestosLicitacionesContent() {
     filtrados = filtrados.filter((p) => p.gruposPresupuestos.length > 0);
 
     return filtrados;
-  }, [proyectosConPresupuestos, searchQuery, filtroPresupuesto]);
+  }, [proyectosConPresupuestos, searchQuery]);
 
 
   // Calcular estadísticas
@@ -167,7 +164,7 @@ function PresupuestosLicitacionesContent() {
     return { totalProyectos, totalGrupos, totalVersiones };
   }, [proyectosFiltrados]);
 
-  const hasActiveFilters = searchQuery || filtroProyecto || filtroPresupuesto;
+  const hasActiveFilters = searchQuery || filtroProyecto;
 
   return (
     <div className="space-y-3">
@@ -185,73 +182,44 @@ function PresupuestosLicitacionesContent() {
 
       {/* Barra de búsqueda y filtros */}
       <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-4">
-        <div className="space-y-3">
+        <div className="flex flex-col md:flex-row gap-3 items-end">
           {/* Búsqueda general */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
-            <Input
-              type="text"
-              placeholder="Buscar por nombre de presupuesto o ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 text-xs"
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
+              <Input
+                type="text"
+                placeholder="Buscar por nombre de presupuesto, proyecto o ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 text-xs h-8"
+              />
+            </div>
+          </div>
+
+          {/* Filtro por proyecto */}
+          <div className="flex-1">
+            <SelectSearch
+              value={filtroProyecto || null}
+              onChange={(value) => setFiltroProyecto(value || '')}
+              options={opcionesProyectos}
+              placeholder="Buscar por proyecto..."
+              className="h-8 text-xs"
             />
           </div>
 
-          {/* Filtros */}
-          <div className="flex flex-col md:flex-row gap-3">
-            {/* Filtro por proyecto */}
-            <div className="flex-1">
-              <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">
-                Filtrar por Proyecto
-              </label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
-                <select
-                  value={filtroProyecto}
-                  onChange={(e) => setFiltroProyecto(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="">Todos los proyectos</option>
-                  {proyectos.map((proyecto) => (
-                    <option key={proyecto.id_proyecto} value={proyecto.id_proyecto}>
-                      {proyecto.nombre_proyecto}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          {/* Botón limpiar filtros */}
+          {hasActiveFilters && (
+            <div>
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 h-8 px-3 py-1 rounded-lg text-xs bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow transition-all duration-200"
+              >
+                <X className="h-4 w-4" />
+                Limpiar
+              </button>
             </div>
-
-            {/* Filtro por ID de presupuesto */}
-            <div className="flex-1">
-              <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">
-                Filtrar por ID Presupuesto
-              </label>
-              <div className="relative">
-                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
-                <Input
-                  type="text"
-                  placeholder="Ej: PTO0000000172"
-                  value={filtroPresupuesto}
-                  onChange={(e) => setFiltroPresupuesto(e.target.value)}
-                  className="pl-10 text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Botón limpiar filtros */}
-            {hasActiveFilters && (
-              <div className="flex items-end">
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center gap-1.5 h-10 px-3 py-1.5 rounded-lg text-xs bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow transition-all duration-200"
-                >
-                  <X className="h-4 w-4" />
-                  Limpiar
-                </button>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
 

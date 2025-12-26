@@ -2,7 +2,7 @@
 //select adaptable
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, X, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface SelectSearchOption {
@@ -18,6 +18,9 @@ export interface SelectSearchProps {
   className?: string;
   disabled?: boolean;
   isLoading?: boolean;
+  showSearchIcon?: boolean; // Si true, muestra el ícono de lupa
+  onSearch?: (searchTerm: string) => Promise<SelectSearchOption[]>; // Búsqueda en servidor opcional
+  minCharsForSearch?: number; // Mínimo de caracteres para activar búsqueda en servidor (default: 2)
 }
 
 export function SelectSearch({
@@ -28,17 +31,28 @@ export function SelectSearch({
   className,
   disabled = false,
   isLoading = false,
+  showSearchIcon = false,
+  onSearch,
+  minCharsForSearch = 2,
 }: SelectSearchProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value || '');
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0, isDropup: false, bottom: undefined as number | undefined });
+  const [serverOptions, setServerOptions] = useState<SelectSearchOption[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Encontrar la opción seleccionada para mostrar su label
+  // Si el valor es null o vacío, buscar la opción con value === '' como valor por defecto
   const selectedOption = React.useMemo(() => {
-    if (!value) return null;
+    if (!value && value !== '') {
+      // Si es null o undefined, buscar opción por defecto (value === '')
+      const defaultOption = options.find(opt => opt.value === '');
+      return defaultOption || null;
+    }
     return options.find(opt => opt.value === value);
   }, [value, options]);
 
@@ -48,22 +62,72 @@ export function SelectSearch({
     if (selectedOption) {
       setInputValue(selectedOption.label);
     } else {
-    setInputValue(value || '');
+      setInputValue(value || '');
     }
   }, [value, selectedOption]);
 
+  // Búsqueda en servidor cuando hay onSearch
+  useEffect(() => {
+    if (!onSearch) return;
+
+    const searchTerm = inputValue.trim();
+    
+    // Si hay menos caracteres que el mínimo, limpiar resultados de servidor
+    if (searchTerm.length < minCharsForSearch) {
+      setServerOptions([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Limpiar timeout anterior
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Debounce de búsqueda en servidor
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await onSearch(searchTerm);
+        setServerOptions(results);
+      } catch (error) {
+        console.error('Error en búsqueda en servidor:', error);
+        setServerOptions([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [inputValue, onSearch, minCharsForSearch]);
+
   // Filtrar opciones según el texto del input
+  // Si hay búsqueda en servidor activa, usar esas opciones, sino filtrar localmente
   const filteredOptions = React.useMemo(() => {
-    if (!inputValue.trim()) {
+    const searchTerm = inputValue.trim();
+    
+    // Si hay búsqueda en servidor y el término tiene suficientes caracteres, usar resultados del servidor
+    if (onSearch && searchTerm.length >= minCharsForSearch) {
+      return serverOptions;
+    }
+    
+    // Si no hay término de búsqueda, mostrar todas las opciones
+    if (!searchTerm) {
       return options;
     }
-    const term = inputValue.toLowerCase().trim();
+    
+    // Filtrar localmente
+    const term = searchTerm.toLowerCase();
     return options.filter(
       (opt) =>
         opt.label.toLowerCase().includes(term) ||
         opt.value.toLowerCase().includes(term)
     );
-  }, [options, inputValue]);
+  }, [options, inputValue, onSearch, serverOptions, minCharsForSearch]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
@@ -99,11 +163,35 @@ export function SelectSearch({
   const updateDropdownPosition = () => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY + 4, // mt-1 = 4px
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      });
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownMaxHeight = 240; // max-h-60 = 240px
+      const gap = 4; // gap entre input y dropdown
+      
+      // Si no hay suficiente espacio abajo pero sí arriba, mostrar arriba
+      const shouldShowAbove = spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow;
+      
+      if (shouldShowAbove) {
+        // Posicionar arriba del input, justo encima sin separación
+        // Usar bottom en lugar de top para que quede pegado al input
+        setDropdownPosition({
+          top: 0, // Se calculará con bottom
+          left: rect.left + window.scrollX,
+          width: rect.width,
+          isDropup: true,
+          bottom: window.innerHeight - rect.top + window.scrollY + gap, // Distancia desde el bottom del viewport
+        });
+      } else {
+        // Posicionar abajo del input (comportamiento por defecto)
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY + gap,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+          isDropup: false,
+          bottom: undefined,
+        });
+      }
     }
   };
 
@@ -115,6 +203,7 @@ export function SelectSearch({
       updateDropdownPosition();
     }
   }, [isOpen]);
+
 
   // Actualizar posición cuando se hace scroll o se redimensiona la ventana
   useEffect(() => {
@@ -153,7 +242,8 @@ export function SelectSearch({
   const handleSelectOption = (option: SelectSearchOption) => {
     // Establecer el label para mostrar el nombre, no el ID
     setInputValue(option.label);
-    onChange(option.value);
+    // Si el valor es '', mantenerlo como '' en lugar de null
+    onChange(option.value === '' ? '' : option.value);
     setIsOpen(false);
     if (inputRef.current) {
       inputRef.current.blur();
@@ -200,16 +290,25 @@ export function SelectSearch({
   // Determinar si debe tener text-center
   // Solo aplicar text-center si viene explícitamente en el className
   // O si es el estilo del panel (text-xs h-6) y NO tiene text-left/text-right
+  // PERO si hay icono de búsqueda, el texto debe estar alineado a la izquierda
   const hasTextCenter = otherInputClasses.includes('text-center');
   const hasTextLeft = otherInputClasses.includes('text-left');
   const hasTextRight = otherInputClasses.includes('text-right');
   const isPanelStyle = otherInputClasses.includes('text-xs') && otherInputClasses.includes('h-6');
-  const shouldCenter = hasTextCenter || (isPanelStyle && !hasTextLeft && !hasTextRight);
+  const shouldCenter = hasTextCenter || (isPanelStyle && !hasTextLeft && !hasTextRight && !showSearchIcon);
+
+  // Determinar padding izquierdo según si hay ícono de búsqueda
+  const leftPadding = showSearchIcon 
+    ? (otherInputClasses.includes('text-xs') ? 'pl-6' : 'pl-7')
+    : '';
 
   return (
     <div ref={containerRef} className={cn('relative', widthClass)}>
       {/* Input editable - mismo estilo que el Input original */}
       <div className="relative flex items-center w-full">
+        {showSearchIcon && (
+          <Search className="absolute left-1.5 top-1/2 transform -translate-y-1/2 h-2.5 w-2.5 text-[var(--text-secondary)] pointer-events-none z-10" />
+        )}
         <input
           ref={inputRef}
           type="text"
@@ -229,6 +328,8 @@ export function SelectSearch({
               : defaultClasses,
             // Solo aplicar text-center si no hay text-left/text-right explícito
             shouldCenter && !hasTextLeft && !hasTextRight ? 'text-center' : '',
+            // Ajustar padding izquierdo si hay ícono de búsqueda
+            showSearchIcon && leftPadding,
             // Ajustar padding derecho según el tamaño del texto (solo si no viene px-* personalizado)
             !hasPaddingX && (otherInputClasses.includes('text-xs') ? 'pr-7' : 'pr-8'),
             disabled && 'opacity-50 cursor-not-allowed',
@@ -263,7 +364,10 @@ export function SelectSearch({
           ref={dropdownRef}
           className="fixed z-[9999] bg-[var(--card-bg)] border border-[var(--border-color)] rounded-md shadow-lg max-h-60 overflow-hidden"
           style={{ 
-            top: `${dropdownPosition.top}px`,
+            ...(dropdownPosition.isDropup && dropdownPosition.bottom !== undefined
+              ? { bottom: `${dropdownPosition.bottom}px`, top: 'auto' }
+              : { top: `${dropdownPosition.top}px`, bottom: 'auto' }
+            ),
             left: `${dropdownPosition.left}px`,
             width: `${dropdownPosition.width}px`,
             backgroundColor: 'var(--card-bg)',
@@ -272,12 +376,17 @@ export function SelectSearch({
         >
           {/* Lista de opciones */}
           <div className="max-h-60 overflow-y-auto">
-            {isLoading ? (
+            {(isLoading || isSearching) ? (
               <div className="px-3 py-2 text-xs text-[var(--text-secondary)] text-center">
                 Cargando...
               </div>
+            ) : filteredOptions.length === 0 && inputValue.trim().length >= minCharsForSearch ? (
+              <div className="px-3 py-2 text-xs text-[var(--text-secondary)] text-center">
+                No se encontraron resultados
+              </div>
             ) : (
-              filteredOptions.map((option) => {
+              // Invertir el array cuando es dropup para que el primer elemento aparezca al final
+              (dropdownPosition.isDropup ? [...filteredOptions].reverse() : filteredOptions).map((option) => {
                 const isSelected = value === option.value || inputValue === option.value || inputValue === option.label;
                 return (
                   <button

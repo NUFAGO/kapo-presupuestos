@@ -20,6 +20,7 @@ export const GET_APROBACIONES_PENDIENTES_AGRUPADAS_QUERY = `
         id_grupo_version
         presupuestoPadre {
           id_presupuesto
+          id_proyecto
           nombre_presupuesto
           fecha_creacion
           total_presupuesto

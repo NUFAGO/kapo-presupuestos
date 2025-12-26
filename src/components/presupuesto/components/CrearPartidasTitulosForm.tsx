@@ -105,8 +105,9 @@ export default function CrearPartidasTitulosForm({
       // Guardar pasando el nombre y los datos de partida si es tipo PARTIDA
       if (tipo === 'PARTIDA') {
         // No enviar precio_unitario ni parcial_partida (se calculan desde el APU)
+        // Aplicar 'und' por defecto solo si no se seleccionó ninguna unidad
         const partidaDataToSave = {
-          unidad_medida: localPartidaData.unidad_medida,
+          unidad_medida: localPartidaData.unidad_medida || 'und',
           metrado: localPartidaData.metrado,
           precio_unitario: isEdit && partidaData ? partidaData.precio_unitario : 0,
           parcial_partida: isEdit && partidaData ? partidaData.parcial_partida : 0,
@@ -164,8 +165,9 @@ export default function CrearPartidasTitulosForm({
               <SelectSearch
                 value={localPartidaData.unidad_medida || null}
                 onChange={(value) => {
-                  // Si se borra, mantener 'und' por defecto
-                  handlePartidaFieldChange('unidad_medida', value || 'und');
+                  // Permitir que el usuario seleccione cualquier valor, incluyendo null
+                  // El valor por defecto 'und' solo se aplicará al guardar si no hay valor
+                  handlePartidaFieldChange('unidad_medida', value || '');
                 }}
                 options={unidades.map(unidad => ({
                   value: unidad.nombre,

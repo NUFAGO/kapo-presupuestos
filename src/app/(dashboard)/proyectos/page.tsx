@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, Search, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import Modal from '@/components/ui/modal';
 import { LoadingSpinner } from '@/components/ui';
 import ProyectoCard from './components/ProyectoCard';
@@ -73,6 +74,15 @@ function ProyectosContent() {
 
   const proyectos = data?.data || [];
   const pagination = data?.pagination;
+
+  // Opciones para el filtro de estado
+  const opcionesEstados = useMemo(() => [
+    { value: '', label: 'Todos los estados' },
+    { value: 'ACTIVO', label: 'Activo' },
+    { value: 'INACTIVO', label: 'Inactivo' },
+    { value: 'EN_PROCESO', label: 'En Proceso' },
+    { value: 'FINALIZADO', label: 'Finalizado' },
+  ], []);
 
   const handleOpenModal = () => {
     setSelectedProyecto(null);
@@ -154,11 +164,6 @@ function ProyectosContent() {
     // setCurrentPage ya se resetea automáticamente en el hook
   };
 
-  const handleEstadoFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setEstadoFilter(e.target.value);
-    // setCurrentPage ya se resetea automáticamente en el hook
-  };
-
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -182,7 +187,7 @@ function ProyectosContent() {
 
       {/* Barra de búsqueda y filtros */}
       <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-4">
-        <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex flex-col md:flex-row gap-3 items-end">
           {/* Búsqueda */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
@@ -191,28 +196,24 @@ function ProyectosContent() {
               placeholder="Buscar por nombre, cliente, empresa o ID..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="pl-10 text-xs"
+              className="pl-10 text-xs h-8"
             />
           </div>
 
           {/* Filtro de estado */}
           <div className="flex items-center gap-2">
-            <select
-              value={estadoFilter}
-              onChange={handleEstadoFilterChange}
-              className="flex h-10 w-full md:w-[150px] rounded-md border border-[var(--border-color)] bg-[var(--background)] px-3 py-2 text-xs text-[var(--text-primary)] ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-color)] focus-visible:ring-offset-2"
-            >
-              <option value="">Todos los estados</option>
-              <option value="ACTIVO">Activo</option>
-              <option value="INACTIVO">Inactivo</option>
-              <option value="EN_PROCESO">En Proceso</option>
-              <option value="FINALIZADO">Finalizado</option>
-            </select>
+            <Select
+              value={estadoFilter || null}
+              onChange={(value) => setEstadoFilter(value || '')}
+              options={opcionesEstados}
+              placeholder="Seleccione estado..."
+              className="h-8 text-xs w-full md:w-[150px]"
+            />
 
             {(searchQuery || estadoFilter) && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow transition-all duration-200"
+                className="flex items-center gap-1.5 h-8 px-3 py-1 rounded-lg bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow transition-all duration-200"
               >
                 <X className="h-4 w-4" />
                 Limpiar

@@ -48,6 +48,7 @@ export interface ProyectoConAprobaciones {
     id_grupo_version: string;
     presupuestoPadre: {
       id_presupuesto: string;
+      id_proyecto: string;
       nombre_presupuesto: string;
       fecha_creacion: string;
       total_presupuesto: number;

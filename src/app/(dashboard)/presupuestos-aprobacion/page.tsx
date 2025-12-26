@@ -3,14 +3,37 @@
 import { useState, useMemo } from 'react';
 import { Search, X, Building2, FileText, Layers, CheckCircle2, Clock, ArrowRight, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import ProyectoGrupoCardAprobacion from './components/ProyectoGrupoCardAprobacion';
 import { useAprobacionesPendientesAgrupadas } from '@/hooks/useAprobaciones';
+import { useProyectos } from '@/hooks';
 
 export default function PresupuestosAprobacionPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filtroProyecto, setFiltroProyecto] = useState<string>('');
-  const [filtroPresupuesto, setFiltroPresupuesto] = useState<string>('');
   const [filtroTipoAprobacion, setFiltroTipoAprobacion] = useState<'' | 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META' | 'OFICIALIZAR_META'>('');
+
+  // Obtener todos los proyectos para el filtro
+  const { data: proyectosData } = useProyectos({
+    pagination: {
+      page: 1,
+      limit: 1000,
+      sortBy: 'nombre_proyecto',
+      sortOrder: 'asc',
+    },
+  });
+  const proyectos = proyectosData?.data || [];
+
+  // Preparar opciones para Select de proyectos
+  const opcionesProyectos = useMemo(() => {
+    return [
+      { value: '', label: 'Todos los proyectos' },
+      ...proyectos.map(proyecto => ({
+        value: proyecto.id_proyecto,
+        label: proyecto.nombre_proyecto,
+      })),
+    ];
+  }, [proyectos]);
 
   // Obtener datos reales del backend
   const { data: proyectosConPresupuestos = [], isLoading, error } = useAprobacionesPendientesAgrupadas();
@@ -22,7 +45,7 @@ export default function PresupuestosAprobacionPage() {
     let filtrados = proyectosConPresupuestos.map((proyectoConPresupuestos) => {
       let gruposFiltrados = [...proyectoConPresupuestos.gruposPresupuestos];
 
-      // Filtro por búsqueda general
+      // Filtro por búsqueda general (nombre de presupuesto, proyecto o ID)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         gruposFiltrados = gruposFiltrados.filter(
@@ -38,13 +61,10 @@ export default function PresupuestosAprobacionPage() {
         );
       }
 
-      // Filtro por ID de presupuesto específico
-      if (filtroPresupuesto.trim()) {
-        const query = filtroPresupuesto.toLowerCase().trim();
+      // Filtro por proyecto
+      if (filtroProyecto) {
         gruposFiltrados = gruposFiltrados.filter(
-          (grupo) =>
-            grupo.presupuestoPadre.id_presupuesto.toLowerCase().includes(query) ||
-            grupo.versiones.some((v) => v.id_presupuesto.toLowerCase().includes(query))
+          (grupo) => grupo.presupuestoPadre.id_proyecto === filtroProyecto
         );
       }
 
@@ -65,7 +85,7 @@ export default function PresupuestosAprobacionPage() {
     filtrados = filtrados.filter((p) => p.gruposPresupuestos.length > 0);
 
     return filtrados;
-  }, [proyectosConPresupuestos, searchQuery, filtroPresupuesto, filtroTipoAprobacion]);
+  }, [proyectosConPresupuestos, searchQuery, filtroProyecto, filtroTipoAprobacion]);
 
   // Calcular estadísticas
   const estadisticas = useMemo(() => {
@@ -98,11 +118,10 @@ export default function PresupuestosAprobacionPage() {
   const clearFilters = () => {
     setSearchQuery('');
     setFiltroProyecto('');
-    setFiltroPresupuesto('');
     setFiltroTipoAprobacion('');
   };
 
-  const hasActiveFilters = searchQuery || filtroProyecto || filtroPresupuesto || filtroTipoAprobacion;
+  const hasActiveFilters = searchQuery || filtroProyecto || filtroTipoAprobacion;
 
   return (
     <div className="space-y-3">
@@ -120,72 +139,61 @@ export default function PresupuestosAprobacionPage() {
 
       {/* Barra de búsqueda y filtros */}
       <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-4">
-        <div className="space-y-3">
+        <div className="flex flex-col md:flex-row gap-3 items-end">
           {/* Búsqueda general */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
-            <Input
-              type="text"
-              placeholder="Buscar por nombre de presupuesto, proyecto o ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 text-xs"
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
+              <Input
+                type="text"
+                placeholder="Buscar por nombre de presupuesto, proyecto o ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 text-xs h-8"
+              />
+            </div>
+          </div>
+
+          {/* Filtro por proyecto */}
+          <div className="flex-1">
+            <Select
+              value={filtroProyecto || null}
+              onChange={(value) => setFiltroProyecto(value || '')}
+              options={opcionesProyectos}
+              placeholder="Buscar por proyecto..."
+              className="h-8 text-xs"
             />
           </div>
 
-          {/* Filtros */}
-          <div className="flex flex-col md:flex-row gap-3">
-            {/* Filtro por tipo de aprobación */}
-            <div className="flex-1">
-              <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">
-                Tipo de Aprobación
-              </label>
-              <div className="relative">
-                <CheckCircle2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
-                <select
-                  value={filtroTipoAprobacion}
-                  onChange={(e) => setFiltroTipoAprobacion(e.target.value as '' | 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META' | 'OFICIALIZAR_META')}
-                  className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="">Todos los tipos</option>
-                  <option value="LICITACION_A_CONTRACTUAL">Licitación → Contractual</option>
-                  <option value="CONTRACTUAL_A_META">Contractual → Meta</option>
-                  <option value="NUEVA_VERSION_META">Nueva Versión Meta</option>
-                  <option value="OFICIALIZAR_META">Oficializar Meta</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Filtro por ID de presupuesto */}
-            <div className="flex-1">
-              <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">
-                Filtrar por ID Presupuesto
-              </label>
-              <div className="relative">
-                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
-                <Input
-                  type="text"
-                  placeholder="Ej: PTO0000000172"
-                  value={filtroPresupuesto}
-                  onChange={(e) => setFiltroPresupuesto(e.target.value)}
-                  className="pl-10 text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Botón limpiar filtros */}
-            {hasActiveFilters && (
-              <div className="flex items-end">
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center gap-1.5 h-10 px-3 rounded-lg text-xs font-medium transition-all duration-200 bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow"
-                >
-                  <X className="h-4 w-4" />
-                  Limpiar
-                </button>
-              </div>
-            )}
+          {/* Filtro por tipo de aprobación */}
+          <div className="flex-1">
+            <Select
+              value={filtroTipoAprobacion || null}
+              onChange={(value) => setFiltroTipoAprobacion((value || '') as '' | 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META' | 'OFICIALIZAR_META')}
+              options={[
+                { value: '', label: 'Todos los tipos' },
+                { value: 'LICITACION_A_CONTRACTUAL', label: 'Licitación → Contractual' },
+                { value: 'CONTRACTUAL_A_META', label: 'Contractual → Meta' },
+                { value: 'NUEVA_VERSION_META', label: 'Nueva Versión Meta' },
+                { value: 'OFICIALIZAR_META', label: 'Oficializar Meta' },
+              ]}
+              placeholder="Seleccione tipo..."
+              className="h-8 text-xs"
+            />
           </div>
+
+          {/* Botón limpiar filtros */}
+          {hasActiveFilters && (
+            <div>
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 h-8 px-3 py-1 rounded-lg text-xs bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow transition-all duration-200"
+              >
+                <X className="h-4 w-4" />
+                Limpiar
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

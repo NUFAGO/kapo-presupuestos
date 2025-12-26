@@ -1,5 +1,5 @@
 'use client';
-
+//componente de selección de opciones con búsqueda mas usada del sistema
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, ChevronDown } from 'lucide-react';

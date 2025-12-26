@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Plus, Trash2, Save, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SearchInput, type SearchItem } from '@/components/ui/search-input';
 import { SelectSearch } from '@/components/ui/select-search';
 import { useUnidades } from '@/hooks/useCatalogos';
 import { Recurso } from '@/hooks/useRecursos';
@@ -756,17 +755,19 @@ export default function DetallePartidaPanel({
 
   // Almacenar recursos completos para poder usarlos al seleccionar
   const recursosCompletosRef = useRef<Map<string, Recurso>>(new Map());
+  const [opcionesRecursos, setOpcionesRecursos] = useState<Array<{ value: string; label: string }>>([]);
+  const [isLoadingRecursos, setIsLoadingRecursos] = useState(false);
 
-  // Función de búsqueda para SearchInput
-  const buscarRecursos = useCallback(async (query: string): Promise<SearchItem[]> => {
+  // Función de búsqueda en servidor para SelectSearch
+  const buscarRecursosEnServidor = useCallback(async (searchTerm: string): Promise<Array<{ value: string; label: string }>> => {
     try {
       const response = await executeQuery<{ listRecursosPaginated: any }>(
         LIST_RECURSOS_PAGINATED_QUERY,
         {
           input: {
             page: 1,
-            itemsPage: query ? 20 : 7, // Si no hay query, solo traer 7 para resultados iniciales
-            searchTerm: query || undefined, // Si query está vacío, no enviar searchTerm
+            itemsPage: 50, // Cargar suficientes resultados de búsqueda
+            searchTerm: searchTerm || undefined,
           }
         }
       );
@@ -777,12 +778,10 @@ export default function DetallePartidaPanel({
           recursosCompletosRef.current.set(r.id, r);
         });
 
-        return response.listRecursosPaginated.recursos.map((r: Recurso): SearchItem => ({
-          id: r.id,
-          nombre: r.nombre,
-          codigo: r.codigo,
-          precio_actual: r.precio_actual,
-          vigente: r.vigente,
+        // Crear opciones para SelectSearch
+        return response.listRecursosPaginated.recursos.map((r: Recurso) => ({
+          value: r.id,
+          label: `${r.codigo ? r.codigo + ' - ' : ''}${r.nombre}`,
         }));
       }
       return [];
@@ -790,6 +789,44 @@ export default function DetallePartidaPanel({
       console.error('Error al buscar recursos:', error);
       return [];
     }
+  }, []);
+
+  // Cargar recursos iniciales (sin búsqueda) para mostrar opciones por defecto
+  useEffect(() => {
+    const cargarIniciales = async () => {
+      setIsLoadingRecursos(true);
+      try {
+        const response = await executeQuery<{ listRecursosPaginated: any }>(
+          LIST_RECURSOS_PAGINATED_QUERY,
+          {
+            input: {
+              page: 1,
+              itemsPage: 100, // Cargar recursos iniciales
+              searchTerm: undefined,
+            }
+          }
+        );
+
+        if (response?.listRecursosPaginated?.recursos) {
+          response.listRecursosPaginated.recursos.forEach((r: Recurso) => {
+            recursosCompletosRef.current.set(r.id, r);
+          });
+
+          const opciones = response.listRecursosPaginated.recursos.map((r: Recurso) => ({
+            value: r.id,
+            label: `${r.codigo ? r.codigo + ' - ' : ''}${r.nombre}`,
+          }));
+
+          setOpcionesRecursos(opciones);
+        }
+      } catch (error) {
+        console.error('Error al cargar recursos iniciales:', error);
+      } finally {
+        setIsLoadingRecursos(false);
+      }
+    };
+
+    cargarIniciales();
   }, []);
 
   const handleSeleccionarRecurso = async (recursoId: string, recurso: Recurso) => {
@@ -3054,43 +3091,23 @@ export default function DetallePartidaPanel({
                     >
                       <td className="pl-3 pr-1 py-1 text-left align-top">
                         {modoReal === 'edicion' && recurso.enEdicion && !recurso.recurso_id ? (
-                          <SearchInput
-                            placeholder="Buscar recurso..."
-                            onSearch={buscarRecursos}
-                            onSelect={(item: SearchItem) => {
-                              // Obtener el recurso completo del ref
-                              const recursoCompleto = recursosCompletosRef.current.get(item.id);
-                              if (recursoCompleto) {
-                                handleSeleccionarRecurso(recurso.id_recurso_apu, recursoCompleto);
+                          <SelectSearch
+                            value={null}
+                            onChange={(recursoId) => {
+                              if (recursoId) {
+                                const recursoCompleto = recursosCompletosRef.current.get(recursoId);
+                                if (recursoCompleto) {
+                                  handleSeleccionarRecurso(recurso.id_recurso_apu, recursoCompleto);
+                                }
                               }
                             }}
-                            renderItem={(item: SearchItem) => {
-                              const recursoCompleto = recursosCompletosRef.current.get(item.id);
-                              return (
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="text-[11px] text-[var(--text-primary)] truncate">
-                                      {item.nombre}
-                                    </div>
-                                    {item.codigo && (
-                                      <div className="text-[10px] text-[var(--text-secondary)] truncate">
-                                        {item.codigo}
-                                      </div>
-                                    )}
-                                  </div>
-                                  {recursoCompleto?.unidad?.nombre && (
-                                    <span className="text-[10px] text-[var(--text-secondary)] whitespace-nowrap">
-                                      {recursoCompleto.unidad.nombre}
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            }}
-                            className="text-xs"
-                            minChars={2}
-                            inputHeight="h-6"
-                            showInitialResults={true}
-                            initialResultsCount={7}
+                            options={opcionesRecursos}
+                            onSearch={buscarRecursosEnServidor}
+                            placeholder="Buscar recurso..."
+                            className="text-xs h-6 w-full"
+                            isLoading={isLoadingRecursos}
+                            showSearchIcon={true}
+                            minCharsForSearch={2}
                           />
                         ) : (
                           <div

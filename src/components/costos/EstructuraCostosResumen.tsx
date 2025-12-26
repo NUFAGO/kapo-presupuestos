@@ -5,7 +5,7 @@ import { ChevronDown, ChevronRight, ArrowLeft, Maximize2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { LoadingSpinner } from '@/components/ui';
 import { Input } from '@/components/ui/input';
-import { SearchInput, type SearchItem } from '@/components/ui/search-input';
+import { SelectSearch } from '@/components/ui/select-search';
 import { IconButton } from '@/components/ui/icon-button';
 import { useEstructuraPresupuesto } from '@/hooks/usePresupuestos';
 import { useApuByPartida } from '@/hooks/useAPU';
@@ -439,41 +439,119 @@ export default function EstructuraCostosResumen({
     return null;
   }, [recursoSeleccionado, datosAPUMeta]);
 
-  // Función de búsqueda para SearchInput
-  const buscarPartidas = useCallback(async (query: string): Promise<SearchItem[]> => {
-    if (!query || query.length < 1) {
-      // Si no hay query, devolver todas las partidas principales (sin subpartidas)
-      return partidasOrdenadas
-        .filter(p => !p.id_partida_padre)
-        .map(partida => ({
-          id: partida.id_partida,
-          nombre: `${partida.numero_item || ''} - ${partida.descripcion || ''}`,
-          codigo: partida.numero_item || '',
-        }));
-    }
-
-    const queryLower = query.toLowerCase();
+  // Opciones de partidas para SelectSearch
+  const opcionesPartidas = useMemo(() => {
     return partidasOrdenadas
-      .filter(partida => {
-        const descripcion = (partida.descripcion || '').toLowerCase();
-        const numeroItem = (partida.numero_item || '').toLowerCase();
-        return descripcion.includes(queryLower) || numeroItem.includes(queryLower);
-      })
+      .filter(p => !p.id_partida_padre) // Solo partidas principales
       .map(partida => ({
-        id: partida.id_partida,
-        nombre: `${partida.numero_item || ''} - ${partida.descripcion || ''}`,
-        codigo: partida.numero_item || '',
+        value: partida.id_partida,
+        label: `${partida.numero_item || ''} - ${partida.descripcion || ''}`,
       }));
   }, [partidasOrdenadas]);
 
+  // Función para encontrar el contenedor visible con scroll
+  const findVisibleScrollContainer = useCallback(() => {
+    const allScrollContainers = document.querySelectorAll('div.overflow-y-auto');
+    
+    for (const container of allScrollContainers) {
+      const htmlContainer = container as HTMLElement;
+      const rect = htmlContainer.getBoundingClientRect();
+      const styles = window.getComputedStyle(htmlContainer);
+      const hasTable = htmlContainer.querySelector('table') !== null;
+      const isVisible = 
+        styles.display !== 'none' && 
+        styles.visibility !== 'hidden' && 
+        rect.width > 0 && 
+        rect.height > 0 &&
+        htmlContainer.scrollHeight > 0 &&
+        hasTable;
+      
+      if (isVisible) {
+        return htmlContainer;
+      }
+    }
+    
+    if (tableRef.current) {
+      const rect = tableRef.current.getBoundingClientRect();
+      const styles = window.getComputedStyle(tableRef.current);
+      const isVisible = 
+        styles.display !== 'none' && 
+        styles.visibility !== 'hidden' && 
+        rect.width > 0 && 
+        rect.height > 0 &&
+        tableRef.current.scrollHeight > 0;
+      
+      if (isVisible) {
+        return tableRef.current;
+      }
+    }
+    
+    return null;
+  }, []);
+
+  // Función para centrar una partida en el scroll del contenedor
+  const scrollToPartida = useCallback((id_partida: string, retryCount = 0) => {
+    const rowElement = partidaRefs.current.get(id_partida);
+    const container = findVisibleScrollContainer();
+    
+    if (!rowElement || !container) {
+      if (retryCount < 8) {
+        setTimeout(() => scrollToPartida(id_partida, retryCount + 1), 200);
+      }
+      return;
+    }
+
+    const containerHeight = container.clientHeight;
+    const containerScrollHeight = container.scrollHeight;
+    
+    if (containerHeight === 0 || containerScrollHeight === 0) {
+      if (retryCount < 8) {
+        setTimeout(() => scrollToPartida(id_partida, retryCount + 1), 200);
+      }
+      return;
+    }
+
+    // Método mejorado: calcular la posición absoluta de la fila dentro del contenedor
+    const tbody = rowElement.closest('tbody');
+    if (!tbody) return;
+    
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    const rowIndex = allRows.indexOf(rowElement);
+    
+    if (rowIndex === -1) return;
+    
+    const thead = container.querySelector('thead');
+    const theadHeight = thead ? (thead as HTMLElement).offsetHeight : 0;
+    const scrollableContentHeight = container.scrollHeight - theadHeight;
+    const rowPositionRatio = rowIndex / allRows.length;
+    const estimatedRowPosition = theadHeight + (rowPositionRatio * scrollableContentHeight);
+    
+    const containerViewportHeight = container.clientHeight;
+    const centerOffset = containerViewportHeight / 2;
+    const targetScrollTop = estimatedRowPosition - centerOffset;
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    const finalScrollTop = Math.max(0, Math.min(targetScrollTop, maxScrollTop));
+    
+    container.scrollTo({
+      top: finalScrollTop,
+      behavior: 'smooth'
+    });
+  }, []);
+
   // Función para manejar la selección de una partida desde el buscador
-  const handleSeleccionarPartida = useCallback((item: SearchItem) => {
-    const partida = partidasOrdenadas.find(p => p.id_partida === item.id);
+  const handleSeleccionarPartida = useCallback((id_partida: string | null) => {
+    if (!id_partida) {
+      setPartidaSeleccionada(null);
+      return;
+    }
+
+    const partida = partidasOrdenadas.find(p => p.id_partida === id_partida);
     if (partida) {
       setPartidaSeleccionada(partida);
       
       // Asegurar que la partida no esté colapsada si tiene subpartidas
-      if (getSubpartidas(partida.id_partida).length > 0) {
+      const tieneSubpartidas = getSubpartidas(partida.id_partida).length > 0;
+      if (tieneSubpartidas) {
         setPartidasColapsadas(prev => {
           const nuevo = new Set(prev);
           nuevo.delete(partida.id_partida);
@@ -481,27 +559,34 @@ export default function EstructuraCostosResumen({
         });
       }
 
-      // Hacer scroll hasta la partida seleccionada
-      setTimeout(() => {
-        const rowElement = partidaRefs.current.get(partida.id_partida);
-        if (rowElement && tableRef.current) {
-          rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
+      // Hacer scroll con delay para que el DOM se actualice completamente
+      // Usar múltiples requestAnimationFrame y un delay más largo
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              scrollToPartida(partida.id_partida);
+            }, tieneSubpartidas ? 500 : 400);
+          });
+        });
+      });
     }
-  }, [partidasOrdenadas, getSubpartidas]);
+  }, [partidasOrdenadas, getSubpartidas, scrollToPartida]);
 
-  // Efecto para hacer scroll cuando cambia la partida seleccionada
+  // Efecto para hacer scroll cuando cambia la partida seleccionada (click directo)
   useEffect(() => {
     if (partidaSeleccionada) {
-      setTimeout(() => {
-        const rowElement = partidaRefs.current.get(partidaSeleccionada.id_partida);
-        if (rowElement && tableRef.current) {
-          rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              scrollToPartida(partidaSeleccionada.id_partida);
+            }, 400);
+          });
+        });
+      });
     }
-  }, [partidaSeleccionada]);
+  }, [partidaSeleccionada?.id_partida, scrollToPartida]);
 
   if (isLoading) {
     return (
@@ -585,20 +670,13 @@ export default function EstructuraCostosResumen({
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <h2 className="text-xs font-semibold text-[var(--text-primary)]">Presupuesto Meta</h2>
                 <div className="flex-1 w-full sm:max-w-xs">
-                  <SearchInput
+                  <SelectSearch
+                    value={partidaSeleccionada?.id_partida || null}
+                    onChange={handleSeleccionarPartida}
+                    options={opcionesPartidas}
                     placeholder="Buscar partida..."
-                    minChars={1}
-                    onSearch={buscarPartidas}
-                    onSelect={handleSeleccionarPartida}
-                    className="w-full"
-                    inputHeight="h-7"
-                    showInitialResults={true}
-                    renderItem={(item) => (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-[var(--text-secondary)]">{item.codigo}</span>
-                        <span className="text-[11px] text-[var(--text-primary)] truncate">{item.nombre.replace(`${item.codigo} - `, '')}</span>
-                      </div>
-                    )}
+                    className="w-full text-xs h-7"
+                    showSearchIcon={true}
                   />
                 </div>
               </div>
@@ -964,7 +1042,6 @@ export default function EstructuraCostosResumen({
                   size="sm"
                   label="Detalle completo"
                   title="Ver análisis detallado de toda la partida"
-                  className="!bg-blue-600/20 hover:!bg-blue-600/30 !text-blue-950 dark:!text-blue-600"
                   onClick={() => {
                     // Abrir modal con vista de partida completa
                     if (datosCostoReal.length > 0) {
@@ -1164,20 +1241,13 @@ export default function EstructuraCostosResumen({
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <h2 className="text-xs font-semibold text-[var(--text-primary)]">Presupuesto Meta</h2>
                 <div className="flex-1 w-full sm:max-w-xs">
-                  <SearchInput
+                  <SelectSearch
+                    value={partidaSeleccionada?.id_partida || null}
+                    onChange={handleSeleccionarPartida}
+                    options={opcionesPartidas}
                     placeholder="Buscar partida..."
-                    minChars={1}
-                    onSearch={buscarPartidas}
-                    onSelect={handleSeleccionarPartida}
-                    className="w-full"
-                    inputHeight="h-7"
-                    showInitialResults={true}
-                    renderItem={(item) => (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-[var(--text-secondary)]">{item.codigo}</span>
-                        <span className="text-[11px] text-[var(--text-primary)] truncate">{item.nombre.replace(`${item.codigo} - `, '')}</span>
-                      </div>
-                    )}
+                    className="w-full text-xs h-7"
+                    showSearchIcon={true}
                   />
                 </div>
               </div>
@@ -1551,7 +1621,6 @@ export default function EstructuraCostosResumen({
                   size="sm"
                   label="Detalle completo"
                   title="Ver análisis detallado de toda la partida"
-                  className="!bg-blue-600/20 hover:!bg-blue-600/30 !text-blue-950 dark:!text-blue-950"
                   onClick={() => {
                     // Abrir modal con vista de partida completa
                     if (datosCostoReal.length > 0) {
@@ -1752,20 +1821,12 @@ export default function EstructuraCostosResumen({
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <h2 className="text-xs font-semibold text-[var(--text-primary)]">Presupuesto Meta</h2>
                   <div className="flex-1 w-full sm:max-w-xs">
-                    <SearchInput
+                    <SelectSearch
+                      value={partidaSeleccionada?.id_partida || null}
+                      onChange={handleSeleccionarPartida}
+                      options={opcionesPartidas}
                       placeholder="Buscar partida..."
-                      minChars={1}
-                      onSearch={buscarPartidas}
-                      onSelect={handleSeleccionarPartida}
-                      className="w-full"
-                      inputHeight="h-7"
-                      showInitialResults={true}
-                      renderItem={(item) => (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono text-[var(--text-secondary)]">{item.codigo}</span>
-                          <span className="text-[11px] text-[var(--text-primary)] truncate">{item.nombre.replace(`${item.codigo} - `, '')}</span>
-                        </div>
-                      )}
+                      className="w-full text-xs h-7"
                     />
                   </div>
                 </div>
@@ -2126,7 +2187,6 @@ export default function EstructuraCostosResumen({
                     size="sm"
                     label="Detalle completo"
                     title="Ver análisis detallado de toda la partida"
-                    className="!bg-blue-600/20 hover:!bg-blue-600/30 !text-blue-950 dark:!text-blue-50"
                     onClick={() => {
                       // Abrir modal con vista de partida completa
                       if (datosCostoReal.length > 0) {

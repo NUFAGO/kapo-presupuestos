@@ -197,20 +197,21 @@ export default function ProyectoForm({
               Estado del Proyecto
             </label>
             <Select
-              id="estado"
               value={formData.estado}
-              onChange={(e) => handleChange('estado', e.target.value)}
+              onChange={(value) => handleChange('estado', value || '')}
               disabled={isSubmitting}
-            >
-              <option value="BORRADOR">BORRADOR</option>
-              <option value="EN REVISIÓN">EN REVISIÓN</option>
-              <option value="APROBADO">APROBADO</option>
-              <option value="EN CURSO">EN CURSO</option>
-              <option value="SUSPENDIDO">SUSPENDIDO</option>
-              <option value="CANCELADO">CANCELADO</option>
-              <option value="COMPLETADO">COMPLETADO</option>
-              <option value="CERRADO">CERRADO</option>
-            </Select>
+              options={[
+                { value: 'BORRADOR', label: 'BORRADOR' },
+                { value: 'EN REVISIÓN', label: 'EN REVISIÓN' },
+                { value: 'APROBADO', label: 'APROBADO' },
+                { value: 'EN CURSO', label: 'EN CURSO' },
+                { value: 'SUSPENDIDO', label: 'SUSPENDIDO' },
+                { value: 'CANCELADO', label: 'CANCELADO' },
+                { value: 'COMPLETADO', label: 'COMPLETADO' },
+                { value: 'CERRADO', label: 'CERRADO' },
+              ]}
+              placeholder="Seleccione estado"
+            />
           </div>
         )}
 
@@ -234,20 +235,19 @@ export default function ProyectoForm({
           </label>
           <div className="flex gap-1">
             <Select
-              id="id_infraestructura"
-              value={formData.id_infraestructura}
-              onChange={(e) => handleChange('id_infraestructura', e.target.value)}
-              required
+              value={formData.id_infraestructura || null}
+              onChange={(value) => handleChange('id_infraestructura', value || '')}
               disabled={isSubmitting || isLoadingInfraestructuras}
               className="flex-1"
-            >
-              <option value="">Seleccione infraestructura</option>
-              {infraestructuras.map((infra) => (
-                <option key={infra.id_infraestructura} value={infra.id_infraestructura}>
-                  {infra.nombre_infraestructura} ({infra.tipo_infraestructura})
-                </option>
-              ))}
-            </Select>
+              isLoading={isLoadingInfraestructuras}
+              options={[
+                { value: '', label: 'Seleccione infraestructura' },
+                ...infraestructuras.map((infra) => ({
+                  value: infra.id_infraestructura,
+                  label: `${infra.nombre_infraestructura} (${infra.tipo_infraestructura})`,
+                })),
+              ]}
+            />
             <button
               type="button"
               onClick={() => setIsInfraestructuraModalOpen(true)}
@@ -268,20 +268,19 @@ export default function ProyectoForm({
             </label>
             <div className="flex gap-1">
               <Select
-                id="id_departamento"
-                value={formData.id_departamento}
-                onChange={(e) => handleChange('id_departamento', e.target.value)}
-                required
+                value={formData.id_departamento || null}
+                onChange={(value) => handleChange('id_departamento', value || '')}
                 disabled={isSubmitting || isLoadingDepartamentos}
                 className="flex-1"
-              >
-                <option value="">Seleccione departamento</option>
-                {departamentos.map((dep) => (
-                  <option key={dep.id_departamento} value={dep.id_departamento}>
-                    {dep.nombre_departamento}
-                  </option>
-                ))}
-              </Select>
+                isLoading={isLoadingDepartamentos}
+                options={[
+                  { value: '', label: 'Seleccione departamento' },
+                  ...departamentos.map((dep) => ({
+                    value: dep.id_departamento,
+                    label: dep.nombre_departamento,
+                  })),
+                ]}
+              />
               <button
                 type="button"
                 onClick={() => setIsDepartamentoModalOpen(true)}
@@ -301,20 +300,19 @@ export default function ProyectoForm({
               </label>
               <div className="flex gap-1">
                 <Select
-                  id="id_provincia"
-                  value={formData.id_provincia}
-                  onChange={(e) => handleChange('id_provincia', e.target.value)}
-                  required
+                  value={formData.id_provincia || null}
+                  onChange={(value) => handleChange('id_provincia', value || '')}
                   disabled={isSubmitting || isLoadingProvincias}
                   className="flex-1"
-                >
-                  <option value="">Seleccione provincia</option>
-                  {provincias.map((prov) => (
-                    <option key={prov.id_provincia} value={prov.id_provincia}>
-                      {prov.nombre_provincia}
-                    </option>
-                  ))}
-                </Select>
+                  isLoading={isLoadingProvincias}
+                  options={[
+                    { value: '', label: 'Seleccione provincia' },
+                    ...provincias.map((prov) => ({
+                      value: prov.id_provincia,
+                      label: prov.nombre_provincia,
+                    })),
+                  ]}
+                />
                 <button
                   type="button"
                   onClick={() => setIsProvinciaModalOpen(true)}
@@ -335,20 +333,19 @@ export default function ProyectoForm({
               </label>
               <div className="flex gap-1">
                 <Select
-                  id="id_distrito"
-                  value={formData.id_distrito}
-                  onChange={(e) => handleChange('id_distrito', e.target.value)}
-                  required
+                  value={formData.id_distrito || null}
+                  onChange={(value) => handleChange('id_distrito', value || '')}
                   disabled={isSubmitting || isLoadingDistritos}
                   className="flex-1"
-                >
-                  <option value="">Seleccione distrito</option>
-                  {distritos.map((dist) => (
-                    <option key={dist.id_distrito} value={dist.id_distrito}>
-                      {dist.nombre_distrito}
-                    </option>
-                  ))}
-                </Select>
+                  isLoading={isLoadingDistritos}
+                  options={[
+                    { value: '', label: 'Seleccione distrito' },
+                    ...distritos.map((dist) => ({
+                      value: dist.id_distrito,
+                      label: dist.nombre_distrito,
+                    })),
+                  ]}
+                />
                 <button
                   type="button"
                   onClick={() => setIsDistritoModalOpen(true)}
@@ -369,19 +366,19 @@ export default function ProyectoForm({
               </label>
               <div className="flex gap-1">
                 <Select
-                  id="id_localidad"
-                  value={formData.id_localidad}
-                  onChange={(e) => handleChange('id_localidad', e.target.value)}
+                  value={formData.id_localidad || null}
+                  onChange={(value) => handleChange('id_localidad', value || '')}
                   disabled={isSubmitting || isLoadingLocalidades}
                   className="flex-1"
-                >
-                  <option value="">Seleccione Localidad</option>
-                  {localidades.map((loc) => (
-                    <option key={loc.id_localidad} value={loc.id_localidad}>
-                      {loc.nombre_localidad}
-                    </option>
-                  ))}
-                </Select>
+                  isLoading={isLoadingLocalidades}
+                  options={[
+                    { value: '', label: 'Seleccione Localidad' },
+                    ...localidades.map((loc) => ({
+                      value: loc.id_localidad,
+                      label: loc.nombre_localidad,
+                    })),
+                  ]}
+                />
                 <button
                   type="button"
                   onClick={() => setIsLocalidadModalOpen(true)}
