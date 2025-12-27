@@ -779,10 +779,19 @@ export default function DetallePartidaPanel({
         });
 
         // Crear opciones para SelectSearch
-        return response.listRecursosPaginated.recursos.map((r: Recurso) => ({
-          value: r.id,
-          label: `${r.codigo ? r.codigo + ' - ' : ''}${r.nombre}`,
-        }));
+        return response.listRecursosPaginated.recursos.map((r: Recurso) => {
+          const codigo = r.codigo ? `${r.codigo} - ` : '';
+          const nombre = r.nombre || '';
+          const unidad = r.unidad?.nombre || '';
+          // Formato: "Código - Nombre · UND" (unidad al final separada por punto medio)
+          const label = unidad 
+            ? `${codigo}${nombre} · ${unidad}`
+            : `${codigo}${nombre}`;
+          return {
+            value: r.id,
+            label: label,
+          };
+        });
       }
       return [];
     } catch (error) {
@@ -812,10 +821,19 @@ export default function DetallePartidaPanel({
             recursosCompletosRef.current.set(r.id, r);
           });
 
-          const opciones = response.listRecursosPaginated.recursos.map((r: Recurso) => ({
-            value: r.id,
-            label: `${r.codigo ? r.codigo + ' - ' : ''}${r.nombre}`,
-          }));
+          const opciones = response.listRecursosPaginated.recursos.map((r: Recurso) => {
+            const codigo = r.codigo ? `${r.codigo} - ` : '';
+            const nombre = r.nombre || '';
+            const unidad = r.unidad?.nombre || '';
+            // Formato: "Código - Nombre · UND" (unidad al final separada por punto medio)
+            const label = unidad 
+              ? `${codigo}${nombre} · ${unidad}`
+              : `${codigo}${nombre}`;
+            return {
+              value: r.id,
+              label: label,
+            };
+          });
 
           setOpcionesRecursos(opciones);
         }
@@ -3021,11 +3039,12 @@ export default function DetallePartidaPanel({
                 <div className={`px-1.5 py-0.5 rounded text-xs ${getTipoRecursoColor('EQUIPO')}`}>
                   EQ: S/ {totales.costo_equipos.toFixed(2)}
                 </div>
-                {totales.costo_subcontratos > 0 && (
-                  <div className={`px-1.5 py-0.5 rounded text-xs ${getTipoRecursoColor('SUBCONTRATO')}`}>
-                    SC: S/ {totales.costo_subcontratos.toFixed(2)}
-                  </div>
-                )}
+                <div className={`px-1.5 py-0.5 rounded text-xs ${getTipoRecursoColor('SUBCONTRATO')}`}>
+                  SC: S/ {totales.costo_subcontratos.toFixed(2)}
+                </div>
+                <div className={`px-1.5 py-0.5 rounded text-xs ${getTipoRecursoColor('MATERIAL', true)}`}>
+                  SP: S/ {totales.costo_subpartidas.toFixed(2)}
+                </div>
               </div>
             ) : (
               <div className="flex gap-1.5">
@@ -3037,6 +3056,12 @@ export default function DetallePartidaPanel({
                 </div>
                 <div className="px-1.5 py-0.5 rounded text-xs bg-gray-500/10 text-gray-600 dark:text-gray-400 opacity-50">
                   EQ: S/ 0.00
+                </div>
+                <div className="px-1.5 py-0.5 rounded text-xs bg-gray-500/10 text-gray-600 dark:text-gray-400 opacity-50">
+                  SC: S/ 0.00
+                </div>
+                <div className="px-1.5 py-0.5 rounded text-xs bg-gray-500/10 text-gray-600 dark:text-gray-400 opacity-50">
+                  SP: S/ 0.00
                 </div>
               </div>
             )}

@@ -18,6 +18,7 @@ import { executeMutation, executeQuery } from '@/services/graphql-client';
 import { BATCH_ESTRUCTURA_PRESUPUESTO_MUTATION } from '@/graphql/mutations/estructura-batch.mutations';
 import { UPDATE_PRESUPUESTO_MUTATION } from '@/graphql/mutations/presupuesto.mutations';
 import toast from 'react-hot-toast';
+import { Input } from '@/components/ui/input';
 
 // ============================================================================
 // TIPOS Y INTERFACES
@@ -149,6 +150,10 @@ export default function EstructuraPresupuestoEditor({
   const [tituloEditando, setTituloEditando] = useState<Titulo | null>(null);
   const [partidaEditando, setPartidaEditando] = useState<Partida | null>(null);
   const [nombreItem, setNombreItem] = useState('');
+  
+  // Estado para edición inline de metrado
+  const [partidaEditandoMetrado, setPartidaEditandoMetrado] = useState<string | null>(null);
+  const [valorMetradoTemporal, setValorMetradoTemporal] = useState<string>('');
 
   // Estado para el modal de agregar sub partida
   const [modalAgregarSubPartidaAbierto, setModalAgregarSubPartidaAbierto] = useState(false);
@@ -562,6 +567,58 @@ export default function EstructuraPresupuestoEditor({
   const handleSeleccionar = (id: string) => {
     setItemSeleccionado(id === itemSeleccionado ? null : id);
   };
+
+  // Handler para iniciar edición de metrado con un clic
+  const handleIniciarEdicionMetrado = useCallback((idPartida: string, metradoActual: number, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (modo !== 'edicion') return;
+    setPartidaEditandoMetrado(idPartida);
+    setValorMetradoTemporal(metradoActual.toString());
+  }, [modo]);
+
+  // Handler para guardar metrado editado
+  const handleGuardarMetrado = useCallback((idPartida: string) => {
+    const valorNumerico = parseFloat(valorMetradoTemporal.replace(/,/g, ''));
+    
+    if (isNaN(valorNumerico) || valorNumerico < 0) {
+      // Si el valor no es válido, restaurar el valor original
+      const partida = partidas.find(p => p.id_partida === idPartida);
+      if (partida) {
+        setValorMetradoTemporal(partida.metrado.toString());
+      }
+      return;
+    }
+
+    // Actualizar el metrado y recalcular el parcial
+    setPartidas(prev => prev.map(p => {
+      if (p.id_partida === idPartida) {
+        const nuevoMetrado = valorNumerico;
+        const nuevoParcial = nuevoMetrado * p.precio_unitario;
+        return {
+          ...p,
+          metrado: nuevoMetrado,
+          parcial_partida: nuevoParcial
+        };
+      }
+      return p;
+    }));
+
+    // Cerrar edición
+    setPartidaEditandoMetrado(null);
+    setValorMetradoTemporal('');
+  }, [valorMetradoTemporal, partidas]);
+
+  // Handler para cancelar edición de metrado
+  const handleCancelarEdicionMetrado = useCallback((idPartida: string) => {
+    const partida = partidas.find(p => p.id_partida === idPartida);
+    if (partida) {
+      setValorMetradoTemporal(partida.metrado.toString());
+    }
+    setPartidaEditandoMetrado(null);
+    setValorMetradoTemporal('');
+  }, [partidas]);
 
   // Detectar si el item seleccionado es una partida
   const partidaSeleccionada = useMemo(() => {
@@ -2865,8 +2922,39 @@ export default function EstructuraPresupuestoEditor({
                         </td>
 
                         {/* Metrado */}
-                        <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
-                          <span className="text-xs text-[var(--text-secondary)]">{partida.metrado.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <td 
+                          className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap"
+                          onClick={(e) => handleIniciarEdicionMetrado(partida.id_partida, partida.metrado, e)}
+                        >
+                          {partidaEditandoMetrado === partida.id_partida ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={valorMetradoTemporal}
+                              onChange={(e) => setValorMetradoTemporal(e.target.value)}
+                              onBlur={() => handleGuardarMetrado(partida.id_partida)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleGuardarMetrado(partida.id_partida);
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  handleCancelarEdicionMetrado(partida.id_partida);
+                                }
+                              }}
+                              className="w-full text-xs text-center h-6 px-1"
+                              autoFocus
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span 
+                              className={`text-xs ${modo === 'edicion' ? 'text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}
+                              title={modo === 'edicion' ? 'Clic para editar' : ''}
+                            >
+                              {partida.metrado.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          )}
                         </td>
 
                         {/* Precio */}
