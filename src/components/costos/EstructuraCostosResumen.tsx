@@ -20,7 +20,6 @@ interface EstructuraCostosResumenProps {
   id_presupuesto: string;
 }
 
-
 export default function EstructuraCostosResumen({
   id_presupuesto,
 }: EstructuraCostosResumenProps) {
