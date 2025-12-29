@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, ChevronDown, ChevronRight, ChevronLeft, ArrowUp, ArrowDown, Scissors, Clipboard, ArrowLeft, Trash2, Save, Loader2 } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, ChevronLeft, ArrowUp, ArrowDown, Scissors, Clipboard, ArrowLeft, Trash2, Save, Loader2, CheckSquare, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/ui';
 import Modal from '@/components/ui/modal';
@@ -19,6 +19,12 @@ import { BATCH_ESTRUCTURA_PRESUPUESTO_MUTATION } from '@/graphql/mutations/estru
 import { UPDATE_PRESUPUESTO_MUTATION } from '@/graphql/mutations/presupuesto.mutations';
 import toast from 'react-hot-toast';
 import { Input } from '@/components/ui/input';
+import {
+  obtenerIdPadreReferencia,
+  sonTodosHermanos,
+  tieneRelacionConSeleccionados,
+  obtenerTipoItem as obtenerTipoItemUtil,
+} from './utils/seleccionMultiple';
 
 // ============================================================================
 // TIPOS Y INTERFACES
@@ -80,7 +86,26 @@ export default function EstructuraPresupuestoEditor({
   const [titulosColapsados, setTitulosColapsados] = useState<Set<string>>(new Set());
   const [partidasColapsadas, setPartidasColapsadas] = useState<Set<string>>(new Set());
   const [itemSeleccionado, setItemSeleccionado] = useState<string | null>(null);
+  const [modoSeleccionMultiple, setModoSeleccionMultiple] = useState(false);
+  const [itemsSeleccionadosMultiple, setItemsSeleccionadosMultiple] = useState<Set<string>>(new Set());
   const [itemCortado, setItemCortado] = useState<string | null>(null);
+  const [itemsCortadosMultiple, setItemsCortadosMultiple] = useState<Set<string>>(new Set());
+  
+  // Helper para verificar si hay items cortados (compatibilidad con ambos modos)
+  const hayItemsCortados = useMemo(() => {
+    return itemCortado !== null || itemsCortadosMultiple.size > 0;
+  }, [itemCortado, itemsCortadosMultiple]);
+  
+  // Helper para verificar si un item está seleccionado (en modo múltiple)
+  const estaSeleccionado = useCallback((id: string): boolean => {
+    if (modoSeleccionMultiple) {
+      return itemsSeleccionadosMultiple.has(id);
+    }
+    return itemSeleccionado === id;
+  }, [modoSeleccionMultiple, itemsSeleccionadosMultiple, itemSeleccionado]);
+  
+  // Verificar si hay selección múltiple activa
+  const haySeleccionMultiple = modoSeleccionMultiple && itemsSeleccionadosMultiple.size > 1;
 
   // Estado para el panel redimensionable (porcentaje del panel inferior, inicialmente 30%)
   const [panelInferiorHeight, setPanelInferiorHeight] = useState(40);
@@ -107,6 +132,12 @@ export default function EstructuraPresupuestoEditor({
   // Estado local para manejar los datos (se actualiza cuando llegan los datos del backend)
   const [titulos, setTitulos] = useState<Titulo[]>([]);
   const [partidas, setPartidas] = useState<Partida[]>([]);
+  
+  // Verificar si todos los seleccionados son hermanos (solo en modo múltiple)
+  const todosSonHermanos = useMemo(() => {
+    if (!modoSeleccionMultiple || itemsSeleccionadosMultiple.size <= 1) return true;
+    return sonTodosHermanos(Array.from(itemsSeleccionadosMultiple), titulos, partidas);
+  }, [modoSeleccionMultiple, itemsSeleccionadosMultiple, titulos, partidas]);
 
   // Estado para datos originales (para comparar cambios)
   const [titulosOriginales, setTitulosOriginales] = useState<Titulo[]>([]);
@@ -126,6 +157,9 @@ export default function EstructuraPresupuestoEditor({
 
   // Contador para generar IDs temporales únicos
   const contadorIdTemporal = useRef(0);
+  
+  // Ref para rastrear qué padres están siendo reordenados para evitar ejecuciones múltiples
+  const padresReordenandoRef = useRef<Set<string | null>>(new Set());
 
   // Obtener id_proyecto de los datos del presupuesto
   const id_proyecto_real = estructuraData?.presupuesto?.id_proyecto || id_proyecto;
@@ -564,8 +598,58 @@ export default function EstructuraPresupuestoEditor({
     });
   };
 
-  const handleSeleccionar = (id: string) => {
-    setItemSeleccionado(id === itemSeleccionado ? null : id);
+  const handleSeleccionar = (id: string, e?: React.MouseEvent) => {
+    if (modoSeleccionMultiple) {
+      // Modo selección múltiple activo
+      const shiftPressed = e?.shiftKey || false;
+
+      if (shiftPressed && itemsSeleccionadosMultiple.size > 0) {
+        // Selección por rango (Shift+Click)
+        const ultimoSeleccionado = Array.from(itemsSeleccionadosMultiple)[itemsSeleccionadosMultiple.size - 1];
+        
+        // Verificar relación padre-hijo
+        if (tieneRelacionConSeleccionados(id, Array.from(itemsSeleccionadosMultiple), titulos, partidas)) {
+          toast.error('No se puede seleccionar un padre junto con sus hijos o viceversa');
+          return;
+        }
+        
+        // Obtener todos los hermanos del último seleccionado
+        const hermanos = obtenerItemsMismoPadre(ultimoSeleccionado);
+        const indiceUltimo = hermanos.findIndex(h => h.id === ultimoSeleccionado);
+        const indiceNuevo = hermanos.findIndex(h => h.id === id);
+        
+        if (indiceUltimo === -1 || indiceNuevo === -1) {
+          // No son hermanos, solo seleccionar el nuevo item
+          setItemsSeleccionadosMultiple(new Set([id]));
+          return;
+        }
+        
+        // Seleccionar el rango entre el último y el nuevo
+        const inicio = Math.min(indiceUltimo, indiceNuevo);
+        const fin = Math.max(indiceUltimo, indiceNuevo);
+        const idsRango = hermanos.slice(inicio, fin + 1).map(h => h.id);
+        setItemsSeleccionadosMultiple(new Set([...itemsSeleccionadosMultiple, ...idsRango]));
+      } else {
+        // Click normal en modo múltiple: toggle del item
+        const nuevoSet = new Set(itemsSeleccionadosMultiple);
+        if (nuevoSet.has(id)) {
+          nuevoSet.delete(id);
+        } else {
+          // Verificar relación padre-hijo antes de agregar
+          if (itemsSeleccionadosMultiple.size > 0) {
+            if (tieneRelacionConSeleccionados(id, Array.from(itemsSeleccionadosMultiple), titulos, partidas)) {
+              toast.error('No se puede seleccionar un padre junto con sus hijos o viceversa');
+              return;
+            }
+          }
+          nuevoSet.add(id);
+        }
+        setItemsSeleccionadosMultiple(nuevoSet);
+      }
+    } else {
+      // Modo normal: selección simple (abre el panel)
+      setItemSeleccionado(id === itemSeleccionado ? null : id);
+    }
   };
 
   // Handler para iniciar edición de metrado con un clic
@@ -711,9 +795,42 @@ export default function EstructuraPresupuestoEditor({
     };
   }, [isResizing]);
 
-  const handleCortar = (id: string) => {
-    setItemCortado(id);
-  };
+  const handleCortar = useCallback((id: string) => {
+    if (modoSeleccionMultiple && itemsSeleccionadosMultiple.size > 0) {
+      // Modo múltiple: cortar todos los seleccionados
+      setItemsCortadosMultiple(new Set(itemsSeleccionadosMultiple));
+      setItemsSeleccionadosMultiple(new Set());
+      setItemCortado(null);
+      // Desactivar modo múltiple para permitir seleccionar destino normalmente
+      setModoSeleccionMultiple(false);
+    } else {
+      // Modo normal: cortar un solo item
+      setItemCortado(id);
+      setItemsCortadosMultiple(new Set());
+    }
+  }, [modoSeleccionMultiple, itemsSeleccionadosMultiple]);
+
+  /**
+   * Cancela el corte de items, limpiando el estado de cortado
+   */
+  const handleCancelarCorte = useCallback(() => {
+    setItemCortado(null);
+    setItemsCortadosMultiple(new Set());
+  }, []);
+
+  // Listener para cancelar corte con Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && hayItemsCortados) {
+        handleCancelarCorte();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [hayItemsCortados, handleCancelarCorte]);
 
   /**
    * Reordena los items de un padre para asegurar ordenes secuenciales (1, 2, 3, ...)
@@ -1088,7 +1205,7 @@ export default function EstructuraPresupuestoEditor({
       nivel_partida: nuevoNivel,
       orden: nuevoOrden,
     };
-  }, [itemSeleccionado, titulos, partidas, obtenerTipoItem, obtenerItemsMismoPadre]);
+  }, [itemSeleccionado, titulos, partidas, obtenerTipoItem, obtenerItemsMismoPadre, modoSeleccionMultiple]);
 
   /**
    * Abre el modal para editar un título existente
@@ -1180,7 +1297,11 @@ export default function EstructuraPresupuestoEditor({
           };
 
           setTitulos(prev => [...prev, nuevoTitulo]);
-          setItemSeleccionado(nuevoTitulo.id_titulo);
+          if (modoSeleccionMultiple) {
+            setItemsSeleccionadosMultiple(new Set([nuevoTitulo.id_titulo]));
+          } else {
+            setItemSeleccionado(nuevoTitulo.id_titulo);
+          }
           delete (window as any).__nuevoTituloTemp;
         }
       }
@@ -1230,7 +1351,11 @@ export default function EstructuraPresupuestoEditor({
           };
 
           setPartidas(prev => [...prev, nuevaPartida]);
-          setItemSeleccionado(nuevaPartida.id_partida);
+          if (modoSeleccionMultiple) {
+            setItemsSeleccionadosMultiple(new Set([nuevaPartida.id_partida]));
+          } else {
+            setItemSeleccionado(nuevaPartida.id_partida);
+          }
           delete (window as any).__nuevaPartidaTemp;
         }
       }
@@ -1256,22 +1381,30 @@ export default function EstructuraPresupuestoEditor({
   }, []);
 
   /**
-   * Pega un bloque cortado en una nueva posición
+   * Pega un bloque cortado en una nueva posición (soporta modo simple y múltiple)
    */
   const handlePegar = useCallback((idDestino: string) => {
-    if (!itemCortado || !idDestino) return;
+    // Determinar si hay items cortados (simple o múltiple)
+    const itemsACortar: string[] = itemsCortadosMultiple.size > 0 
+      ? Array.from(itemsCortadosMultiple) 
+      : itemCortado 
+        ? [itemCortado] 
+        : [];
+    
+    if (itemsACortar.length === 0 || !idDestino) return;
 
-    const tipoCortado = obtenerTipoItem(itemCortado);
     const tipoDestino = obtenerTipoItem(idDestino);
+    if (!tipoDestino) return;
 
-    if (!tipoCortado || !tipoDestino) return;
-
-    // Validar que no se intente mover un título a ser hijo de sí mismo o de sus descendientes
-    if (tipoCortado === 'TITULO') {
-      const idsBloque = obtenerIdsBloqueTitulo(itemCortado);
-      if (idsBloque.includes(idDestino)) {
-        // No se puede mover un título a ser hijo de sí mismo o de sus descendientes
-        return;
+    // Validar que no se intente mover títulos dentro de sí mismos
+    for (const idCortado of itemsACortar) {
+      const tipoCortado = obtenerTipoItem(idCortado);
+      if (tipoCortado === 'TITULO') {
+        const idsBloque = obtenerIdsBloqueTitulo(idCortado);
+        if (idsBloque.includes(idDestino)) {
+          // No se puede mover un título a ser hijo de sí mismo o de sus descendientes
+          return;
+        }
       }
     }
 
@@ -1291,67 +1424,141 @@ export default function EstructuraPresupuestoEditor({
       }
     }
 
-    // Obtener el orden máximo de los items del nuevo padre (títulos + partidas) para colocar al final
-    // IMPORTANTE: Excluir el item que se está moviendo del cálculo
-    const itemsNuevoPadre: Array<{ orden: number }> = [];
+    // Obtener todos los items cortados ordenados según su orden original
+    // Necesitamos obtenerlos del mismo padre para mantener el orden relativo
+    const itemsCortadosOrdenados: Array<{ id: string; tipo: 'TITULO' | 'PARTIDA'; orden: number }> = [];
+    
+    if (itemsACortar.length > 0) {
+      // Obtener el primer item cortado para obtener sus hermanos
+      const primerItem = itemsACortar[0];
+      const hermanos = obtenerItemsMismoPadre(primerItem);
+      
+      // Filtrar solo los items que están cortados
+      const itemsCortadosEncontrados = hermanos.filter(h => itemsACortar.includes(h.id));
+      
+      if (itemsCortadosEncontrados.length > 0) {
+        // Si encontramos items en los hermanos, usarlos (ya están ordenados)
+        itemsCortadosOrdenados.push(...itemsCortadosEncontrados);
+      } else {
+        // Si no se encontraron en los hermanos (caso edge), construir manualmente
+        itemsACortar.forEach(id => {
+          const tipo = obtenerTipoItem(id);
+          if (tipo === 'TITULO') {
+            const titulo = titulos.find(t => t.id_titulo === id);
+            if (titulo) {
+              itemsCortadosOrdenados.push({ id, tipo: 'TITULO', orden: titulo.orden });
+            }
+          } else if (tipo === 'PARTIDA') {
+            const partida = partidas.find(p => p.id_partida === id);
+            if (partida) {
+              itemsCortadosOrdenados.push({ id, tipo: 'PARTIDA', orden: partida.orden });
+            }
+          }
+        });
+        itemsCortadosOrdenados.sort((a, b) => a.orden - b.orden);
+      }
+    }
+
+    // Obtener todos los items del nuevo padre (excluyendo los que se están moviendo)
+    // Usar obtenerItemsMismoPadre para obtener los items correctamente ordenados
+    const idsACortarSet = new Set(itemsACortar);
+    
+    // Necesitamos un item de referencia del nuevo padre para obtener todos sus hermanos
+    let itemsNuevoPadre: Array<{ id: string; tipo: 'TITULO' | 'PARTIDA'; orden: number }> = [];
     
     if (nuevoIdPadre === null) {
-      // Items del nivel raíz (títulos raíz + partidas de títulos raíz)
-      const titulosRaiz = titulos.filter(t => t.id_titulo_padre === null && t.id_titulo !== itemCortado);
-      titulosRaiz.forEach(t => itemsNuevoPadre.push({ orden: t.orden }));
-      titulosRaiz.forEach(tituloRaiz => {
-        partidas
-          .filter(p => p.id_titulo === tituloRaiz.id_titulo && p.id_partida_padre === null && p.id_partida !== itemCortado)
-          .forEach(p => itemsNuevoPadre.push({ orden: p.orden }));
-      });
+      // Items del nivel raíz: solo títulos raíz (las partidas pertenecen a títulos, no al root)
+      const titulosRaiz = titulos.filter(t => t.id_titulo_padre === null && !idsACortarSet.has(t.id_titulo));
+      if (titulosRaiz.length > 0) {
+        // Usar el primer título raíz como referencia
+        itemsNuevoPadre = obtenerItemsMismoPadre(titulosRaiz[0].id_titulo);
+        // Filtrar solo los que NO están siendo cortados
+        itemsNuevoPadre = itemsNuevoPadre.filter(item => !idsACortarSet.has(item.id));
+      }
     } else {
-      // Items del nuevo padre (títulos hijos + partidas principales)
-      // Excluir el item que se está moviendo
-      const titulosHijos = titulos.filter(t => t.id_titulo_padre === nuevoIdPadre && t.id_titulo !== itemCortado);
-      titulosHijos.forEach(t => itemsNuevoPadre.push({ orden: t.orden }));
-      const partidasDelPadre = partidas.filter(p => p.id_titulo === nuevoIdPadre && p.id_partida_padre === null && p.id_partida !== itemCortado);
-      partidasDelPadre.forEach(p => itemsNuevoPadre.push({ orden: p.orden }));
+      // Items del nuevo padre: usar obtenerItemsMismoPadre con cualquier hijo del padre
+      const titulosHijos = titulos.filter(t => t.id_titulo_padre === nuevoIdPadre && !idsACortarSet.has(t.id_titulo));
+      const partidasDelPadre = partidas.filter(p => p.id_titulo === nuevoIdPadre && p.id_partida_padre === null && !idsACortarSet.has(p.id_partida));
+      
+      if (titulosHijos.length > 0) {
+        itemsNuevoPadre = obtenerItemsMismoPadre(titulosHijos[0].id_titulo);
+      } else if (partidasDelPadre.length > 0) {
+        itemsNuevoPadre = obtenerItemsMismoPadre(partidasDelPadre[0].id_partida);
+      }
+      
+      // Filtrar solo los que NO están siendo cortados
+      itemsNuevoPadre = itemsNuevoPadre.filter(item => !idsACortarSet.has(item.id));
     }
     
-    const maxOrden = itemsNuevoPadre.length > 0
-      ? Math.max(...itemsNuevoPadre.map(item => item.orden))
-      : 0;
-    const nuevoOrden = maxOrden + 1;
+    // El siguiente orden debe ser consecutivo: si hay N items, el siguiente es N+1
+    // Esto asegura que siempre sea consecutivo, sin importar los huecos en los órdenes actuales
+    const siguienteOrden = itemsNuevoPadre.length + 1;
 
-    // Actualizar el bloque cortado
-    if (tipoCortado === 'TITULO') {
-      const idsBloque = obtenerIdsBloqueTitulo(itemCortado);
+    // Calcular el nuevo nivel basándose en el nuevo padre
+    let nuevoNivel = 1;
+    if (nuevoIdPadre) {
+      nuevoNivel = calcularNivelDinamico(nuevoIdPadre) + 1;
+    }
 
-      // Obtener el padre original antes de mover
-      const tituloCortado = titulos.find(t => t.id_titulo === itemCortado);
-      const idPadreOriginal = tituloCortado?.id_titulo_padre || null;
+    // Procesar cada item cortado manteniendo el orden relativo
+    // Empezar desde el siguiente orden consecutivo
+    let ordenInicial = siguienteOrden;
+    const padresOriginales = new Set<string | null>();
+    const titulosParaActualizar: Array<{ id: string; nuevoPadre: string | null; nuevoOrden: number; nuevoNivel: number }> = [];
+    const partidasParaActualizar: Array<{ id: string; nuevoTitulo: string; nuevoOrden: number }> = [];
 
-      // Calcular el nuevo nivel basándose en el nuevo padre
-      let nuevoNivel = 1;
-      if (nuevoIdPadre) {
-        nuevoNivel = calcularNivelDinamico(nuevoIdPadre) + 1;
+    for (const item of itemsCortadosOrdenados) {
+      if (item.tipo === 'TITULO') {
+        const titulo = titulos.find(t => t.id_titulo === item.id);
+        if (titulo) {
+          padresOriginales.add(titulo.id_titulo_padre);
+          titulosParaActualizar.push({
+            id: item.id,
+            nuevoPadre: nuevoIdPadre,
+            nuevoOrden: ordenInicial++,
+            nuevoNivel: nuevoNivel
+          });
+        }
+      } else {
+        // Es una partida
+        const partida = partidas.find(p => p.id_partida === item.id);
+        if (partida) {
+          // Para partidas, el "padre" para normalización es el id_titulo de la partida
+          // porque reordenarItemsPadre(idTitulo) normaliza las partidas con id_titulo === idTitulo
+          // (aunque también normaliza títulos hijos, eso está bien porque no afecta a las partidas)
+          padresOriginales.add(partida.id_titulo);
+          partidasParaActualizar.push({
+            id: item.id,
+            nuevoTitulo: nuevoIdPadre || partida.id_titulo,
+            nuevoOrden: ordenInicial++
+          });
+        }
       }
+    }
 
+    // Actualizar títulos
+    if (titulosParaActualizar.length > 0) {
       setTitulos(prev => {
         const actualizados = prev.map(t => {
-          if (t.id_titulo === itemCortado) {
-            return { ...t, id_titulo_padre: nuevoIdPadre, orden: nuevoOrden, nivel: nuevoNivel };
+          const actualizacion = titulosParaActualizar.find(u => u.id === t.id_titulo);
+          if (actualizacion) {
+            return { ...t, id_titulo_padre: actualizacion.nuevoPadre, orden: actualizacion.nuevoOrden, nivel: actualizacion.nuevoNivel };
           }
-          if (idsBloque.includes(t.id_titulo) && t.id_titulo !== itemCortado) {
-            // Mantener la jerarquía relativa dentro del bloque
-            return t;
+          // También mover descendientes de títulos cortados
+          for (const actualizacion of titulosParaActualizar) {
+            const idsBloque = obtenerIdsBloqueTitulo(actualizacion.id);
+            if (idsBloque.includes(t.id_titulo) && t.id_titulo !== actualizacion.id) {
+              // Mantener la jerarquía relativa dentro del bloque
+              return t;
+            }
           }
           return t;
         });
 
-        // Actualizar niveles de todos los descendientes del título movido recursivamente
-        // Usar un Set para evitar bucles infinitos por referencias circulares
+        // Actualizar niveles de todos los descendientes de los títulos movidos
         const procesados = new Set<string>();
         const actualizarDescendientes = (id: string, nivelBase: number) => {
-          // Protección contra bucles infinitos
-          if (procesados.has(id)) {
-            return;
-          }
+          if (procesados.has(id)) return;
           procesados.add(id);
 
           actualizados.forEach(t => {
@@ -1361,59 +1568,53 @@ export default function EstructuraPresupuestoEditor({
             }
           });
         };
-        actualizarDescendientes(itemCortado, nuevoNivel);
+
+        for (const actualizacion of titulosParaActualizar) {
+          actualizarDescendientes(actualizacion.id, actualizacion.nuevoNivel);
+        }
 
         return actualizados;
       });
+    }
 
-      // Reordenar los hermanos del padre original y del nuevo padre después de actualizar
-      // Usar un pequeño delay para asegurar que el estado se haya actualizado
-      setTimeout(() => {
-        if (idPadreOriginal !== nuevoIdPadre) {
-          if (idPadreOriginal !== null) {
-            reordenarItemsPadre(idPadreOriginal);
-          }
-          if (nuevoIdPadre !== null) {
-            reordenarItemsPadre(nuevoIdPadre);
-          }
-        } else if (nuevoIdPadre !== null) {
-          // Si se movió dentro del mismo padre, reordenar
-          reordenarItemsPadre(nuevoIdPadre);
-        }
-      }, 10);
-    } else {
-      // Es una partida
-      const partidaCortada = partidas.find(p => p.id_partida === itemCortado);
-      const idTituloOriginal = partidaCortada?.id_titulo || null;
-      const idsBloque = obtenerIdsBloquePartida(itemCortado);
-      
+    // Actualizar partidas
+    if (partidasParaActualizar.length > 0) {
       setPartidas(prev => prev.map(p => {
-        if (p.id_partida === itemCortado) {
-          return { ...p, id_titulo: nuevoIdPadre || p.id_titulo, orden: nuevoOrden };
+        const actualizacion = partidasParaActualizar.find(u => u.id === p.id_partida);
+        if (actualizacion) {
+          return { ...p, id_titulo: actualizacion.nuevoTitulo, orden: actualizacion.nuevoOrden };
         }
-        if (idsBloque.includes(p.id_partida) && p.id_partida !== itemCortado) {
-          // Mantener la jerarquía relativa dentro del bloque
-          return p;
+        // También mover subpartidas de partidas cortadas
+        for (const actualizacion of partidasParaActualizar) {
+          const idsBloque = obtenerIdsBloquePartida(actualizacion.id);
+          if (idsBloque.includes(p.id_partida) && p.id_partida !== actualizacion.id) {
+            // Mantener la jerarquía relativa dentro del bloque
+            return p;
+          }
         }
         return p;
       }));
-      
-      // Normalizar órdenes del título original después de mover la partida
-      setTimeout(() => {
-        if (idTituloOriginal && idTituloOriginal !== nuevoIdPadre) {
-          const tituloOriginal = titulos.find(t => t.id_titulo === idTituloOriginal);
-          if (tituloOriginal) {
-            reordenarItemsPadre(tituloOriginal.id_titulo_padre);
-          }
-        }
-        if (nuevoIdPadre !== null) {
-          reordenarItemsPadre(nuevoIdPadre);
-        }
-      }, 10);
     }
 
+    // Reordenar los padres originales primero (para normalizar órdenes del lugar de origen)
+    // Luego reordenar el nuevo padre (para normalizar órdenes del lugar de destino)
+    setTimeout(() => {
+      // Normalizar los padres originales (donde se cortaron los items)
+      // Esto reordena los items que quedaron para que tengan órdenes consecutivos
+      padresOriginales.forEach(padreOriginal => {
+        if (padreOriginal !== nuevoIdPadre) {
+          reordenarItemsPadre(padreOriginal);
+        }
+      });
+      // Normalizar el nuevo padre (donde se pegaron los items)
+      // Esto asegura que todos los órdenes sean consecutivos (1, 2, 3, 4...)
+      reordenarItemsPadre(nuevoIdPadre);
+    }, 10);
+
+    // Limpiar items cortados
     setItemCortado(null);
-  }, [itemCortado, obtenerTipoItem, obtenerItemsMismoPadre, obtenerIdsBloqueTitulo, obtenerIdsBloquePartida, titulos, partidas]);
+    setItemsCortadosMultiple(new Set());
+  }, [itemCortado, itemsCortadosMultiple, obtenerTipoItem, obtenerItemsMismoPadre, obtenerIdsBloqueTitulo, obtenerIdsBloquePartida, titulos, partidas, calcularNivelDinamico, reordenarItemsPadre]);
 
   /**
    * Mueve un item (y su bloque completo) hacia arriba
@@ -2001,17 +2202,372 @@ export default function EstructuraPresupuestoEditor({
         }
 
         // Limpiar selección si el item eliminado estaba seleccionado
-        if (itemSeleccionado === id_titulo || idsDescendientes.includes(itemSeleccionado || '')) {
-          setItemSeleccionado(null);
+        if (modoSeleccionMultiple) {
+          setItemsSeleccionadosMultiple(prev => {
+            const nuevo = new Set(prev);
+            nuevo.delete(id_titulo);
+            idsDescendientes.forEach(id => nuevo.delete(id));
+            return nuevo;
+          });
+        } else {
+          if (itemSeleccionado === id_titulo || idsDescendientes.includes(itemSeleccionado || '')) {
+            setItemSeleccionado(null);
+          }
         }
 
         // Limpiar item cortado si estaba en el bloque eliminado
-        if (itemCortado && idsDescendientes.includes(itemCortado)) {
+        const itemCortadoEnBloque = itemCortado && idsDescendientes.includes(itemCortado);
+        const itemsCortadosEnBloque = Array.from(itemsCortadosMultiple).filter(id => idsDescendientes.includes(id));
+        if (itemCortadoEnBloque) {
           setItemCortado(null);
+        }
+        if (itemsCortadosEnBloque.length > 0) {
+          setItemsCortadosMultiple(prev => {
+            const nuevo = new Set(prev);
+            itemsCortadosEnBloque.forEach(id => nuevo.delete(id));
+            return nuevo;
+          });
         }
       },
     });
-  }, [titulos, partidas, itemSeleccionado, itemCortado, obtenerIdsBloqueTitulo, confirm]);
+  }, [titulos, partidas, itemSeleccionado, itemCortado, obtenerIdsBloqueTitulo, confirm, modoSeleccionMultiple]);
+
+  /**
+   * Elimina múltiples items seleccionados en una sola operación con mensaje detallado
+   */
+  const handleEliminarMultiple = useCallback(() => {
+    if (!modoSeleccionMultiple || itemsSeleccionadosMultiple.size === 0) {
+      return;
+    }
+
+    const idsSeleccionados = Array.from(itemsSeleccionadosMultiple);
+    
+    // Agrupar items por tipo y obtener todos los descendientes
+    const titulosAEliminar = new Set<string>();
+    const partidasAEliminar = new Set<string>();
+    
+    // Estructuras para el mensaje detallado
+    const titulosDetalle: Array<{ id: string; descripcion: string; tieneHijos: boolean; cantidadHijos: number }> = [];
+    const partidasDetalle: Array<{ id: string; descripcion: string; tieneSubpartidas: boolean; cantidadSubpartidas: number }> = [];
+    
+    // Primero, identificar todos los items a eliminar (incluyendo descendientes)
+    idsSeleccionados.forEach(id => {
+      const tipo = obtenerTipoItem(id);
+      if (tipo === 'TITULO') {
+        const titulo = titulos.find(t => t.id_titulo === id);
+        if (!titulo) return;
+        
+        const idsBloque = obtenerIdsBloqueTitulo(id);
+        idsBloque.forEach(idBloque => titulosAEliminar.add(idBloque));
+        
+        // Obtener información detallada para el mensaje
+        const tieneHijos = idsBloque.length > 1;
+        const cantidadHijos = idsBloque.length - 1;
+        titulosDetalle.push({
+          id,
+          descripcion: titulo.descripcion,
+          tieneHijos,
+          cantidadHijos
+        });
+        
+        // También agregar partidas asociadas a estos títulos
+        partidas.forEach(p => {
+          if (idsBloque.includes(p.id_titulo)) {
+            const idsBloquePartida = obtenerIdsBloquePartida(p.id_partida);
+            idsBloquePartida.forEach(idPartida => partidasAEliminar.add(idPartida));
+          }
+        });
+      } else if (tipo === 'PARTIDA') {
+        const partida = partidas.find(p => p.id_partida === id);
+        if (!partida) return;
+        
+        const idsBloque = obtenerIdsBloquePartida(id);
+        idsBloque.forEach(idBloque => partidasAEliminar.add(idBloque));
+        
+        // Obtener información detallada para el mensaje
+        const tieneSubpartidas = idsBloque.length > 1;
+        const cantidadSubpartidas = idsBloque.length - 1;
+        partidasDetalle.push({
+          id,
+          descripcion: partida.descripcion,
+          tieneSubpartidas,
+          cantidadSubpartidas
+        });
+      }
+    });
+
+    // Construir mensaje detallado con información específica de cada item (formato compacto)
+    let mensaje = `¿Está seguro de eliminar los siguientes items?\n\n`;
+    
+    if (titulosDetalle.length > 0) {
+      mensaje += `TÍTULOS (${titulosDetalle.length}):\n`;
+      titulosDetalle.forEach((detalle, index) => {
+        mensaje += `${index + 1}. "${detalle.descripcion}"`;
+        
+        // Obtener información detallada de este título específico
+        const titulo = titulos.find(t => t.id_titulo === detalle.id);
+        if (titulo) {
+          const idsBloque = obtenerIdsBloqueTitulo(detalle.id);
+          const titulosHijos = idsBloque.filter(id => id !== detalle.id && titulos.some(t => t.id_titulo === id));
+          const partidasDelBloque = partidas.filter(p => idsBloque.includes(p.id_titulo));
+          
+          const detalles: string[] = [];
+          if (titulosHijos.length > 0) {
+            detalles.push(`${titulosHijos.length} ${titulosHijos.length === 1 ? 'título hijo' : 'títulos hijos'}`);
+          }
+          if (partidasDelBloque.length > 0) {
+            detalles.push(`${partidasDelBloque.length} ${partidasDelBloque.length === 1 ? 'partida' : 'partidas'} (con subpartidas)`);
+          }
+          if (detalles.length > 0) {
+            mensaje += ` → Se eliminarán: ${detalles.join(', ')}`;
+          } else {
+            mensaje += ` → Sin hijos ni partidas`;
+          }
+        }
+        mensaje += `\n`;
+      });
+    }
+    
+    if (partidasDetalle.length > 0) {
+      if (titulosDetalle.length > 0) mensaje += `\n`;
+      mensaje += `PARTIDAS (${partidasDetalle.length}):\n`;
+      partidasDetalle.forEach((detalle, index) => {
+        mensaje += `${index + 1}. "${detalle.descripcion}"`;
+        
+        // Obtener información detallada de esta partida específica
+        const partida = partidas.find(p => p.id_partida === detalle.id);
+        if (partida) {
+          const idsBloque = obtenerIdsBloquePartida(detalle.id);
+          const subpartidas = idsBloque.filter(id => id !== detalle.id);
+          
+          if (subpartidas.length > 0) {
+            mensaje += ` → Se eliminarán ${subpartidas.length} ${subpartidas.length === 1 ? 'subpartida' : 'subpartidas'}`;
+          } else {
+            mensaje += ` → Sin subpartidas`;
+          }
+        }
+        mensaje += `\n`;
+      });
+    }
+    
+    const cantidadTotal = titulosAEliminar.size + partidasAEliminar.size;
+    mensaje += `\n⚠️ TOTAL: ${cantidadTotal} item(s) serán eliminados permanentemente.\nEsta acción NO se puede deshacer.`;
+
+    // Identificar padres afectados para reordenar después
+    // IMPORTANTE: Cada grupo de hermanos debe reordenarse independientemente
+    const padresAfectados = new Set<string | null>();
+    
+    // Para títulos eliminados: reordenar los hermanos del mismo padre
+    titulos.forEach(t => {
+      if (titulosAEliminar.has(t.id_titulo)) {
+        padresAfectados.add(t.id_titulo_padre);
+      }
+    });
+    
+    // Para partidas eliminadas: reordenar los items (títulos hijos + partidas) del título al que pertenecen
+    // Solo partidas principales (sin id_partida_padre) afectan el orden de hermanos
+    // IMPORTANTE: NO reordenar si el título al que pertenece también se está eliminando
+    partidas.forEach(p => {
+      if (partidasAEliminar.has(p.id_partida) && !p.id_partida_padre) {
+        // Solo reordenar si el título al que pertenece NO se está eliminando
+        if (!titulosAEliminar.has(p.id_titulo)) {
+          padresAfectados.add(p.id_titulo);
+        }
+      }
+    });
+
+    // Separar items nuevos de existentes
+    const titulosNuevos = Array.from(titulosAEliminar).filter(id => id.startsWith('temp_'));
+    const titulosExistentes = Array.from(titulosAEliminar).filter(id => !id.startsWith('temp_'));
+    const partidasNuevas = Array.from(partidasAEliminar).filter(id => id.startsWith('temp_'));
+    const partidasExistentes = Array.from(partidasAEliminar).filter(id => !id.startsWith('temp_'));
+
+    // Confirmar eliminación con un solo modal detallado
+    confirm({
+      title: 'Eliminar items seleccionados',
+      message: mensaje,
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+      onConfirm: () => {
+        // Eliminar títulos
+        if (titulosNuevos.length > 0 || titulosExistentes.length > 0) {
+          if (titulosExistentes.length > 0) {
+            setTitulosEliminados(prev => {
+              const nuevo = new Set(prev);
+              titulosExistentes.forEach(id => nuevo.add(id));
+              return nuevo;
+            });
+          }
+          setTitulos(prev => prev.filter(t => !titulosAEliminar.has(t.id_titulo)));
+        }
+
+        // Eliminar partidas
+        if (partidasNuevas.length > 0 || partidasExistentes.length > 0) {
+          if (partidasExistentes.length > 0) {
+            setPartidasEliminadas(prev => {
+              const nuevo = new Set(prev);
+              partidasExistentes.forEach(id => nuevo.add(id));
+              return nuevo;
+            });
+          }
+          setPartidas(prev => prev.filter(p => !partidasAEliminar.has(p.id_partida)));
+        }
+
+        // Limpiar selección múltiple
+        setItemsSeleccionadosMultiple(new Set());
+        setItemSeleccionado(null);
+
+        // Limpiar items cortados si estaban en los eliminados
+        if (itemCortado && (titulosAEliminar.has(itemCortado) || partidasAEliminar.has(itemCortado))) {
+          setItemCortado(null);
+        }
+        setItemsCortadosMultiple(prev => {
+          const nuevo = new Set(prev);
+          Array.from(prev).forEach(id => {
+            if (titulosAEliminar.has(id) || partidasAEliminar.has(id)) {
+              nuevo.delete(id);
+            }
+          });
+          return nuevo;
+        });
+
+        // Reordenar todos los padres afectados EN UNA SOLA OPERACIÓN
+        // IMPORTANTE: No llamar a reordenarItemsPadre múltiples veces porque se sobrescriben
+        setTimeout(() => {
+          const padresArray = Array.from(padresAfectados);
+          
+          // Actualizar títulos Y partidas en una sola operación atómica usando callbacks anidados
+          setTitulos(prevTitulos => {
+            let titulosResultado = [...prevTitulos];
+
+            console.log('[REORDENAMIENTO] === INICIANDO REORDENAMIENTO ATÓMICO ===');
+            console.log('[REORDENAMIENTO] Padres a procesar:', padresArray.map(p => p === null ? 'null (raíz)' : p));
+            console.log('[REORDENAMIENTO] Títulos antes:', titulosResultado.map(t => ({ id: t.id_titulo, desc: t.descripcion, padre: t.id_titulo_padre, orden: t.orden })));
+
+            // Para cada padre, preparar la información necesaria para el reordenamiento
+            const itemsPorPadre: Map<string | null, Array<{ tipo: 'TITULO' | 'PARTIDA'; id: string; orden: number; descripcion: string }>> = new Map();
+
+            padresArray.forEach(padre => {
+              const todosLosItems: Array<{ tipo: 'TITULO' | 'PARTIDA'; id: string; orden: number; descripcion: string }> = [];
+
+              if (padre === null) {
+                // Para raíz: títulos raíz + partidas principales de títulos raíz
+                const titulosRaiz = titulosResultado.filter(t => t.id_titulo_padre === null);
+                titulosRaiz.forEach(t => todosLosItems.push({ tipo: 'TITULO', id: t.id_titulo, orden: t.orden, descripcion: t.descripcion }));
+              } else {
+                // Para otros padres: títulos hijos + partidas principales del padre
+                const titulosHijos = titulosResultado.filter(t => t.id_titulo_padre === padre);
+                titulosHijos.forEach(t => todosLosItems.push({ tipo: 'TITULO', id: t.id_titulo, orden: t.orden, descripcion: t.descripcion }));
+              }
+
+              itemsPorPadre.set(padre, todosLosItems);
+            });
+
+            // Ahora actualizar las partidas usando la información preparada
+            setPartidas(prevPartidas => {
+              let partidasResultado = [...prevPartidas];
+              console.log('[REORDENAMIENTO] Partidas antes:', partidasResultado.map(p => ({ id: p.id_partida, desc: p.descripcion, titulo: p.id_titulo, orden: p.orden })));
+
+              // Completar la información de items con las partidas
+              padresArray.forEach(padre => {
+                const todosLosItems = itemsPorPadre.get(padre)!;
+
+                if (padre === null) {
+                  // Agregar partidas principales de cada título raíz
+                  const titulosRaiz = titulosResultado.filter(t => t.id_titulo_padre === null);
+                  titulosRaiz.forEach(tituloRaiz => {
+                    const partidasRaiz = partidasResultado.filter(p => p.id_titulo === tituloRaiz.id_titulo && p.id_partida_padre === null);
+                    partidasRaiz.forEach(p => todosLosItems.push({ tipo: 'PARTIDA', id: p.id_partida, orden: p.orden, descripcion: p.descripcion }));
+                  });
+                } else {
+                  // Agregar partidas principales de este padre
+                  const partidasPadre = partidasResultado.filter(p => p.id_titulo === padre && p.id_partida_padre === null);
+                  partidasPadre.forEach(p => todosLosItems.push({ tipo: 'PARTIDA', id: p.id_partida, orden: p.orden, descripcion: p.descripcion }));
+                }
+
+                console.log(`[REORDENAMIENTO] Procesando padre: ${padre === null ? 'null (raíz)' : padre}`);
+                console.log(`[REORDENAMIENTO] Items sin ordenar (${todosLosItems.length}):`, todosLosItems.map(item => ({ tipo: item.tipo, desc: item.descripcion, orden: item.orden })));
+
+                // Ordenar TODOS los items por orden actual
+                todosLosItems.sort((a, b) => a.orden - b.orden);
+                console.log(`[REORDENAMIENTO] Items ordenados (${todosLosItems.length}):`, todosLosItems.map(item => ({ tipo: item.tipo, desc: item.descripcion, ordenAntes: item.orden })));
+
+                // Asignar órdenes consecutivos a TODOS los items
+                todosLosItems.forEach((item, index) => {
+                  const nuevoOrden = index + 1;
+                  console.log(`[REORDENAMIENTO] ${item.tipo} "${item.descripcion}": orden ${item.orden} -> ${nuevoOrden}`);
+
+                  if (item.tipo === 'TITULO') {
+                    const indiceEnResultado = titulosResultado.findIndex(t => t.id_titulo === item.id);
+                    if (indiceEnResultado !== -1) {
+                      titulosResultado[indiceEnResultado] = { ...titulosResultado[indiceEnResultado], orden: nuevoOrden };
+                    }
+                  } else {
+                    // PARTIDA
+                    const indiceEnResultado = partidasResultado.findIndex(p => p.id_partida === item.id);
+                    if (indiceEnResultado !== -1) {
+                      partidasResultado[indiceEnResultado] = { ...partidasResultado[indiceEnResultado], orden: nuevoOrden };
+                    }
+                  }
+                });
+              });
+
+              console.log('[REORDENAMIENTO] === FIN REORDENAMIENTO ATÓMICO ===');
+              console.log('[REORDENAMIENTO] Títulos después:', titulosResultado.map(t => ({ id: t.id_titulo, desc: t.descripcion, padre: t.id_titulo_padre, orden: t.orden })));
+              console.log('[REORDENAMIENTO] Partidas después:', partidasResultado.map(p => ({ id: p.id_partida, desc: p.descripcion, titulo: p.id_titulo, orden: p.orden })));
+
+              return partidasResultado;
+            });
+
+            return titulosResultado;
+          });
+          
+          // Actualizar partidas usando los títulos actualizados
+          setPartidas(prevPartidas => {
+            let partidasResultado = [...prevPartidas];
+            console.log('[REORDENAMIENTO] === INICIANDO REORDENAMIENTO PARTIDAS ===');
+            console.log('[REORDENAMIENTO] Partidas antes:', partidasResultado.map(p => ({ id: p.id_partida, desc: p.descripcion, titulo: p.id_titulo, orden: p.orden })));
+
+            // Para cada padre, reordenar las partidas que pertenecen a ese padre
+            padresArray.forEach(padre => {
+              console.log(`[REORDENAMIENTO] Reordenando partidas para padre: ${padre === null ? 'null (raíz)' : padre}`);
+
+              if (padre === null) {
+                // Para raíz: reordenar TODAS las partidas de títulos raíz juntas
+                // Pero ya se reordenaron junto con los títulos, así que solo necesitamos continuar los números
+                console.log(`[REORDENAMIENTO] Partidas de raíz ya incluidas en el reordenamiento conjunto`);
+              } else {
+                // Para otros padres: las partidas deben continuar después de los títulos
+                const titulosDelPadre = titulos.filter(t => t.id_titulo_padre === padre);
+                const partidasDelPadre = partidasResultado
+                  .filter(p => p.id_titulo === padre && p.id_partida_padre === null)
+                  .sort((a, b) => a.orden - b.orden);
+
+                console.log(`[REORDENAMIENTO] Para padre "${padre}": ${titulosDelPadre.length} títulos + ${partidasDelPadre.length} partidas`);
+
+                // Las partidas deben tener órdenes que continúen después de los títulos
+                const ordenBase = titulosDelPadre.length;
+
+                partidasDelPadre.forEach((partida, index) => {
+                  const nuevoOrden = ordenBase + index + 1;
+                  console.log(`[REORDENAMIENTO] Partida "${partida.descripcion}": orden ${partida.orden} -> ${nuevoOrden}`);
+                  const indiceEnResultado = partidasResultado.findIndex(p => p.id_partida === partida.id_partida);
+                  if (indiceEnResultado !== -1) {
+                    partidasResultado[indiceEnResultado] = { ...partidasResultado[indiceEnResultado], orden: nuevoOrden };
+                  }
+                });
+              }
+            });
+
+            console.log('[REORDENAMIENTO] === FIN REORDENAMIENTO PARTIDAS ===');
+            console.log('[REORDENAMIENTO] Partidas después:', partidasResultado.map(p => ({ id: p.id_partida, desc: p.descripcion, titulo: p.id_titulo, orden: p.orden })));
+            return partidasResultado;
+          });
+        }, 10);
+      },
+    });
+  }, [modoSeleccionMultiple, itemsSeleccionadosMultiple, obtenerTipoItem, obtenerIdsBloqueTitulo, obtenerIdsBloquePartida, titulos, partidas, itemCortado, itemsCortadosMultiple, confirm, reordenarItemsPadre]);
 
   /**
    * Elimina una partida (solo en estado local)
@@ -2052,17 +2608,35 @@ export default function EstructuraPresupuestoEditor({
         }
 
         // Limpiar selección si el item eliminado estaba seleccionado
-        if (itemSeleccionado === id_partida || idsDescendientes.includes(itemSeleccionado || '')) {
-          setItemSeleccionado(null);
+        if (modoSeleccionMultiple) {
+          setItemsSeleccionadosMultiple(prev => {
+            const nuevo = new Set(prev);
+            nuevo.delete(id_partida);
+            idsDescendientes.forEach(id => nuevo.delete(id));
+            return nuevo;
+          });
+        } else {
+          if (itemSeleccionado === id_partida || idsDescendientes.includes(itemSeleccionado || '')) {
+            setItemSeleccionado(null);
+          }
         }
 
         // Limpiar item cortado si estaba en el bloque eliminado
-        if (itemCortado && idsDescendientes.includes(itemCortado)) {
+        const itemCortadoEnBloque = itemCortado && idsDescendientes.includes(itemCortado);
+        const itemsCortadosEnBloque = Array.from(itemsCortadosMultiple).filter(id => idsDescendientes.includes(id));
+        if (itemCortadoEnBloque) {
           setItemCortado(null);
+        }
+        if (itemsCortadosEnBloque.length > 0) {
+          setItemsCortadosMultiple(prev => {
+            const nuevo = new Set(prev);
+            itemsCortadosEnBloque.forEach(id => nuevo.delete(id));
+            return nuevo;
+          });
         }
       },
     });
-  }, [partidas, itemSeleccionado, itemCortado, obtenerIdsBloquePartida, confirm]);
+  }, [partidas, itemSeleccionado, itemCortado, obtenerIdsBloquePartida, confirm, modoSeleccionMultiple]);
 
   /**
    * Detecta si hay cambios pendientes (optimizado)
@@ -2121,6 +2695,43 @@ export default function EstructuraPresupuestoEditor({
 
     return false;
   }, [titulos, partidas, titulosOriginales, partidasOriginales, titulosEliminados, partidasEliminadas]);
+
+  /**
+   * Descarta todos los cambios y restaura el estado original
+   */
+  const handleDescartarCambios = useCallback(() => {
+    if (!hayCambiosPendientes) {
+      return;
+    }
+
+    confirm({
+      title: 'Descartar cambios',
+      message: '¿Está seguro de descartar todos los cambios? Esta acción no se puede deshacer.',
+      confirmText: 'Descartar',
+      cancelText: 'Cancelar',
+      variant: 'destructive',
+      onConfirm: () => {
+        // Restaurar títulos y partidas a los valores originales
+        setTitulos(JSON.parse(JSON.stringify(titulosOriginales)));
+        setPartidas(JSON.parse(JSON.stringify(partidasOriginales)));
+
+        // Limpiar estados de eliminados
+        setTitulosEliminados(new Set());
+        setPartidasEliminadas(new Set());
+
+        // Limpiar otros estados
+        setItemSeleccionado(null);
+        setItemsSeleccionadosMultiple(new Set());
+        setItemCortado(null);
+        setItemsCortadosMultiple(new Set());
+        setModoSeleccionMultiple(false);
+        setSubpartidasParaCrearApu(new Map());
+        setSubpartidasPendientes([]);
+
+        toast.success('Cambios descartados');
+      },
+    });
+  }, [hayCambiosPendientes, titulosOriginales, partidasOriginales, confirm]);
 
   /**
    * Guarda todos los cambios pendientes usando mutación batch con transacciones
@@ -2456,6 +3067,13 @@ export default function EstructuraPresupuestoEditor({
       setTitulosEliminados(new Set());
       setPartidasEliminadas(new Set());
 
+      // Limpiar estados de selección múltiple
+      setModoSeleccionMultiple(false);
+      setItemsSeleccionadosMultiple(new Set());
+      setItemSeleccionado(null);
+      setItemCortado(null);
+      setItemsCortadosMultiple(new Set());
+
       toast.success(response.batchEstructuraPresupuesto.message || 'Cambios guardados exitosamente');
     } catch (error: any) {
       console.error('Error al guardar cambios:', error);
@@ -2581,6 +3199,20 @@ export default function EstructuraPresupuestoEditor({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Botón Descartar Cambios */}
+          {modo === 'edicion' && hayCambiosPendientes && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDescartarCambios}
+              disabled={isSaving || isSavingRecursos}
+              className="flex items-center gap-1.5 h-6 px-2 text-xs border-red-300 hover:bg-red-50 hover:border-red-400 text-red-600 dark:border-red-700 dark:hover:bg-red-900/20 dark:text-red-400"
+              title="Descartar todos los cambios y volver al estado original"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Descartar
+            </Button>
+          )}
           {/* Botón Guardar Cambios */}
           {modo === 'edicion' && (
             <Button
@@ -2606,33 +3238,81 @@ export default function EstructuraPresupuestoEditor({
           {/* Botones de acción globales */}
           {modo === 'edicion' && (
             <div className="flex items-center gap-1 border-r border-[var(--border-color)] pr-2 mr-2">
-              {itemCortado ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
+              {/* Botón modo múltiple */}
+              <Button
+                size="sm"
+                variant={modoSeleccionMultiple ? "default" : "ghost"}
+                onClick={() => {
+                  setModoSeleccionMultiple(!modoSeleccionMultiple);
+                  if (!modoSeleccionMultiple) {
+                    // Al activar modo múltiple, mover la selección actual si existe
                     if (itemSeleccionado) {
-                      handlePegar(itemSeleccionado);
+                      setItemsSeleccionadosMultiple(new Set([itemSeleccionado]));
+                      setItemSeleccionado(null);
                     }
-                  }}
-                  disabled={!itemSeleccionado}
-                  className="h-6 w-6 p-0"
-                  title="Pegar aquí"
-                >
-                  <Clipboard className="h-3 w-3" />
-                </Button>
+                  } else {
+                    // Al desactivar modo múltiple, limpiar selección múltiple
+                    setItemsSeleccionadosMultiple(new Set());
+                  }
+                }}
+                className="h-6 w-6 p-0"
+                title={modoSeleccionMultiple ? "Desactivar selección múltiple" : "Activar selección múltiple"}
+              >
+                <CheckSquare className="h-3 w-3" />
+              </Button>
+              {hayItemsCortados ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      if (itemSeleccionado && !haySeleccionMultiple) {
+                        handlePegar(itemSeleccionado);
+                      }
+                    }}
+                    disabled={!itemSeleccionado || haySeleccionMultiple}
+                    className="h-6 w-6 p-0"
+                    title={haySeleccionMultiple ? "Desactivo en selección múltiple" : !itemSeleccionado ? "Seleccione un destino para pegar" : "Pegar aquí"}
+                  >
+                    <Clipboard className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleCancelarCorte}
+                    className="h-6 w-6 p-0"
+                    title="Cancelar corte"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </>
               ) : (
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => {
-                    if (itemSeleccionado) {
+                    if (modoSeleccionMultiple && itemsSeleccionadosMultiple.size > 0) {
+                      // En modo múltiple, cortar el primer item seleccionado
+                      const primerId = Array.from(itemsSeleccionadosMultiple)[0];
+                      if (primerId) handleCortar(primerId);
+                    } else if (itemSeleccionado && !modoSeleccionMultiple) {
                       handleCortar(itemSeleccionado);
                     }
                   }}
-                  disabled={!itemSeleccionado}
+                  disabled={
+                    (!modoSeleccionMultiple && !itemSeleccionado) || 
+                    (modoSeleccionMultiple && (itemsSeleccionadosMultiple.size === 0 || !todosSonHermanos))
+                  }
                   className="h-6 w-6 p-0"
-                  title="Cortar"
+                  title={
+                    modoSeleccionMultiple
+                      ? itemsSeleccionadosMultiple.size === 0
+                        ? "Seleccione items para cortar"
+                        : !todosSonHermanos
+                        ? "Los items seleccionados deben ser hermanos para cortar"
+                        : "Cortar items seleccionados"
+                      : "Cortar"
+                  }
                 >
                   <Scissors className="h-3 w-3" />
                 </Button>
@@ -2641,13 +3321,13 @@ export default function EstructuraPresupuestoEditor({
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  if (itemSeleccionado) {
+                  if (itemSeleccionado && !haySeleccionMultiple) {
                     handleSubir(itemSeleccionado);
                   }
                 }}
-                disabled={!itemSeleccionado}
+                disabled={!itemSeleccionado || haySeleccionMultiple}
                 className="h-6 w-6 p-0"
-                title="Subir"
+                title={haySeleccionMultiple ? "Desactivo en selección múltiple" : "Subir"}
               >
                 <ArrowUp className="h-3 w-3" />
               </Button>
@@ -2655,13 +3335,13 @@ export default function EstructuraPresupuestoEditor({
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  if (itemSeleccionado) {
+                  if (itemSeleccionado && !haySeleccionMultiple) {
                     handleBajar(itemSeleccionado);
                   }
                 }}
-                disabled={!itemSeleccionado}
+                disabled={!itemSeleccionado || haySeleccionMultiple}
                 className="h-6 w-6 p-0"
-                title="Bajar"
+                title={haySeleccionMultiple ? "Desactivo en selección múltiple" : "Bajar"}
               >
                 <ArrowDown className="h-3 w-3" />
               </Button>
@@ -2669,13 +3349,13 @@ export default function EstructuraPresupuestoEditor({
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  if (itemSeleccionado) {
+                  if (itemSeleccionado && !haySeleccionMultiple) {
                     handleMoverIzquierda(itemSeleccionado);
                   }
                 }}
-                disabled={!itemSeleccionado || !puedeMoverIzquierda(itemSeleccionado)}
+                disabled={!itemSeleccionado || haySeleccionMultiple || (itemSeleccionado ? !puedeMoverIzquierda(itemSeleccionado) : true)}
                 className="h-6 w-6 p-0"
-                title="Mover a la izquierda (subir nivel)"
+                title={haySeleccionMultiple ? "Desactivo en selección múltiple" : "Mover a la izquierda (subir nivel)"}
               >
                 <ChevronLeft className="h-3 w-3" />
               </Button>
@@ -2683,13 +3363,13 @@ export default function EstructuraPresupuestoEditor({
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  if (itemSeleccionado) {
+                  if (itemSeleccionado && !haySeleccionMultiple) {
                     handleMoverDerecha(itemSeleccionado);
                   }
                 }}
-                disabled={!itemSeleccionado || !puedeMoverDerecha(itemSeleccionado)}
+                disabled={!itemSeleccionado || haySeleccionMultiple || (itemSeleccionado ? !puedeMoverDerecha(itemSeleccionado) : true)}
                 className="h-6 w-6 p-0"
-                title="Mover a la derecha (bajar nivel)"
+                title={haySeleccionMultiple ? "Desactivo en selección múltiple" : "Mover a la derecha (bajar nivel)"}
               >
                 <ChevronRight className="h-3 w-3" />
               </Button>
@@ -2697,7 +3377,11 @@ export default function EstructuraPresupuestoEditor({
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  if (itemSeleccionado) {
+                  if (modoSeleccionMultiple && itemsSeleccionadosMultiple.size > 0) {
+                    // Usar la función de eliminación múltiple que agrupa todo
+                    handleEliminarMultiple();
+                  } else if (!modoSeleccionMultiple && itemSeleccionado) {
+                    // Eliminar item seleccionado en modo normal
                     const tipo = obtenerTipoItem(itemSeleccionado);
                     if (tipo === 'TITULO') {
                       handleEliminarTitulo(itemSeleccionado);
@@ -2706,9 +3390,15 @@ export default function EstructuraPresupuestoEditor({
                     }
                   }
                 }}
-                disabled={!itemSeleccionado}
+                disabled={modoSeleccionMultiple ? itemsSeleccionadosMultiple.size === 0 : !itemSeleccionado}
                 className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                title="Eliminar"
+                title={
+                  modoSeleccionMultiple
+                    ? itemsSeleccionadosMultiple.size > 0
+                      ? `Eliminar ${itemsSeleccionadosMultiple.size} item(s)`
+                      : "Eliminar"
+                    : "Eliminar"
+                }
               >
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -2787,8 +3477,8 @@ export default function EstructuraPresupuestoEditor({
                     const tieneHijos = tieneHijosTitulo(titulo.id_titulo);
                     const tienePartidasEnTitulo = tienePartidas(titulo.id_titulo);
                     const partidasDelTitulo = getPartidasDeTitulo(titulo.id_titulo);
-                    const esSeleccionado = itemSeleccionado === titulo.id_titulo;
-                    const esCortado = itemCortado === titulo.id_titulo;
+                    const esSeleccionado = estaSeleccionado(titulo.id_titulo);
+                    const esCortado = itemCortado === titulo.id_titulo || itemsCortadosMultiple.has(titulo.id_titulo);
                     // Un título puede colapsarse si tiene hijos (títulos) O partidas
                     const puedeColapsar = tieneHijos || tienePartidasEnTitulo;
 
@@ -2807,7 +3497,7 @@ export default function EstructuraPresupuestoEditor({
                       ${modo === 'edicion' ? (esSeleccionado ? 'hover:bg-blue-500/15 cursor-pointer' : 'hover:bg-[var(--card-bg)]/80 cursor-pointer') : 'cursor-default'}
                       transition-colors
                     `}
-                          onClick={() => handleSeleccionar(titulo.id_titulo)}
+                          onClick={(e) => handleSeleccionar(titulo.id_titulo, e)}
                           onDoubleClick={() => modo === 'edicion' && handleEditarTitulo(titulo.id_titulo)}
                         >
                           {/* Item */}
@@ -2839,6 +3529,9 @@ export default function EstructuraPresupuestoEditor({
                                 style={{ paddingLeft: `${(calcularNivelDinamico(titulo.id_titulo) - 1) * 12}px` }}
                               >
                                 {titulo.descripcion}
+                                <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
+                                  [{titulo.orden}]
+                                </span>
                               </span>
                             </div>
                           </td>
@@ -2874,8 +3567,8 @@ export default function EstructuraPresupuestoEditor({
                       return null; // No mostrar subpartidas aquí
                     }
 
-                    const esSeleccionadaPartida = itemSeleccionado === partida.id_partida;
-                    const esCortadaPartida = itemCortado === partida.id_partida;
+                    const esSeleccionadaPartida = estaSeleccionado(partida.id_partida);
+                    const esCortadaPartida = itemCortado === partida.id_partida || itemsCortadosMultiple.has(partida.id_partida);
 
                     // Si su título padre está colapsado, no mostrar
                     const tituloPadre = titulos.find(t => t.id_titulo === partida.id_titulo);
@@ -2893,7 +3586,7 @@ export default function EstructuraPresupuestoEditor({
                     ${modo === 'edicion' ? (esSeleccionadaPartida ? 'hover:bg-green-500/15 cursor-pointer' : 'hover:bg-[var(--background)]/80 cursor-pointer') : 'cursor-default'}
                     transition-colors
                   `}
-                        onClick={() => handleSeleccionar(partida.id_partida)}
+                        onClick={(e) => handleSeleccionar(partida.id_partida, e)}
                         onDoubleClick={() => modo === 'edicion' && handleEditarPartida(partida.id_partida)}
                       >
                         {/* Item */}
@@ -2912,6 +3605,9 @@ export default function EstructuraPresupuestoEditor({
                               }}
                             >
                               {partida.descripcion}
+                              <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
+                                [{partida.orden}]
+                              </span>
                             </span>
                           </div>
                         </td>
@@ -3010,7 +3706,11 @@ export default function EstructuraPresupuestoEditor({
             apusCalculados={estructuraData?.apus || null}
             onCerrarPanel={() => {
               setPanelInferiorHeight(0);
-              setItemSeleccionado(null);
+              if (modoSeleccionMultiple) {
+                setItemsSeleccionadosMultiple(new Set());
+              } else {
+                setItemSeleccionado(null);
+              }
             }}
             onAgregarSubPartida={() => {
               setSubPartidaParaEditar(null);

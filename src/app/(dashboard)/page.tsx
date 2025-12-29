@@ -84,59 +84,36 @@ interface HistoricoMensualItem {
   total_recepcion_almacen: number;
 }
 
-// Datos ficticios basados en la estructura real
-const datosFicticios: ResumenPresupuestoData = {
-  id_presupuesto: null, // null para vista agregada
+// Datos vacíos para mostrar estructura cuando no hay datos reales
+const datosVacios: ResumenPresupuestoData = {
+  id_presupuesto: null,
   fecha_calculo: new Date().toISOString(),
   es_historico: false,
   es_snapshot: false,
-  
-  // Presupuesto Meta (agregado)
-  total_presupuesto: 12500000.00, // Total agregado de todos los presupuestos
-  cantidad_presupuestos: 5,
-  cantidad_proyectos: 3,
-  promedio_por_presupuesto: 2500000.00, // 12500000 / 5
-  presupuesto_mas_alto: 3500000.00,
-  presupuesto_mas_bajo: 1800000.00,
-  
-  // APU Meta
-  total_composicion: 2350000.00,
-  total_unidades: 18750.00,
-  costo_por_unidad_meta: 133.33, // 2500000 / 18750
-  costo_por_unidad_actual: 125.33, // 2350000 / 18750
-  eficiencia: 106.38, // (133.33 / 125.33) * 100
-  varianza: -6.00, // ((125.33 - 133.33) / 133.33) * 100
-  progreso_proyecto: 68.5,
-  
-  // Costo Real + Proyección
-  total_requerimiento: 1800000.00, // Neto
-  total_requerimiento_bruto: 1950000.00, // Bruto
-  total_ordenes_compra_bienes: 1200000.00,
-  total_ordenes_compra_bienes_bruto: 1280000.00,
-  total_ordenes_compra_servicios: 450000.00,
-  total_ordenes_compra_servicios_bruto: 480000.00,
-  total_recepcion_almacen: 255000.00, // Real recibido
-  total_recepcion_almacen_bruto: 270000.00,
-  
-  // Diferencias
-  diferencia_mayor_gasto: 350000.00, // 2350000 - (1800000 + 200000)
-  diferencia_real_comprometido: 2095000.00, // 2350000 - 255000
-  
-  // Histórico mensual
-  historico_mensual: [
-    { mes: 'Ene', anio: 2024, total_presupuesto: 2500000, total_composicion: 2300000, total_requerimiento: 1500000, total_recepcion_almacen: 180000 },
-    { mes: 'Feb', anio: 2024, total_presupuesto: 2500000, total_composicion: 2320000, total_requerimiento: 1600000, total_recepcion_almacen: 195000 },
-    { mes: 'Mar', anio: 2024, total_presupuesto: 2500000, total_composicion: 2330000, total_requerimiento: 1650000, total_recepcion_almacen: 210000 },
-    { mes: 'Abr', anio: 2024, total_presupuesto: 2500000, total_composicion: 2340000, total_requerimiento: 1700000, total_recepcion_almacen: 225000 },
-    { mes: 'May', anio: 2024, total_presupuesto: 2500000, total_composicion: 2345000, total_requerimiento: 1750000, total_recepcion_almacen: 240000 },
-    { mes: 'Jun', anio: 2024, total_presupuesto: 2500000, total_composicion: 2350000, total_requerimiento: 1800000, total_recepcion_almacen: 255000 },
-    { mes: 'Jul', anio: 2024, total_presupuesto: 2500000, total_composicion: 2350000, total_requerimiento: 1850000, total_recepcion_almacen: 0 },
-    { mes: 'Ago', anio: 2024, total_presupuesto: 2500000, total_composicion: 2350000, total_requerimiento: 1900000, total_recepcion_almacen: 0 },
-    { mes: 'Sep', anio: 2024, total_presupuesto: 2500000, total_composicion: 2350000, total_requerimiento: 1950000, total_recepcion_almacen: 0 },
-    { mes: 'Oct', anio: 2024, total_presupuesto: 2500000, total_composicion: 2350000, total_requerimiento: 2000000, total_recepcion_almacen: 0 },
-    { mes: 'Nov', anio: 2024, total_presupuesto: 2500000, total_composicion: 2350000, total_requerimiento: 2050000, total_recepcion_almacen: 0 },
-    { mes: 'Dic', anio: 2024, total_presupuesto: 2500000, total_composicion: 2350000, total_requerimiento: 2100000, total_recepcion_almacen: 0 }
-  ]
+  total_presupuesto: 0,
+  cantidad_presupuestos: 0,
+  cantidad_proyectos: 0,
+  promedio_por_presupuesto: 0,
+  presupuesto_mas_alto: 0,
+  presupuesto_mas_bajo: 0,
+  total_composicion: 0,
+  total_unidades: 0,
+  costo_por_unidad_meta: 0,
+  costo_por_unidad_actual: 0,
+  eficiencia: 0,
+  varianza: 0,
+  progreso_proyecto: 0,
+  total_requerimiento: 0,
+  total_requerimiento_bruto: 0,
+  total_ordenes_compra_bienes: 0,
+  total_ordenes_compra_bienes_bruto: 0,
+  total_ordenes_compra_servicios: 0,
+  total_ordenes_compra_servicios_bruto: 0,
+  total_recepcion_almacen: 0,
+  total_recepcion_almacen_bruto: 0,
+  diferencia_mayor_gasto: 0,
+  diferencia_real_comprometido: 0,
+  historico_mensual: []
 };
 
 export default function DashboardPage() {
@@ -226,8 +203,8 @@ export default function DashboardPage() {
     isLoading: isLoadingHistorico
   } = useHistoricoMensual(filtrosResumen, 12);
 
-  // Usar datos reales si están disponibles, sino usar ficticios como fallback
-  const datos = datosReales || datosFicticios;
+  // Usar datos reales si están disponibles, sino usar datos vacíos (valores en 0)
+  const datos = datosReales || datosVacios;
   
   // Transformar histórico real al formato esperado
   const historicoMensual = useMemo<HistoricoMensualItem[]>(() => {
@@ -242,10 +219,18 @@ export default function DashboardPage() {
         total_recepcion_almacen: h.total_recepcion_almacen ?? 0
       }));
     }
-    // Fallback a histórico ficticio si no hay datos reales
-    const datosFicticios = datos as any;
-    return datosFicticios.historico_mensual || [];
-  }, [historicoReal, datos]);
+    // Si no hay datos históricos, crear 12 meses con valores en 0 para mostrar el gráfico vacío
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const anioActual = new Date().getFullYear();
+    return meses.map(mes => ({
+      mes: `${mes} ${anioActual}`,
+      anio: anioActual,
+      total_presupuesto: 0,
+      total_composicion: 0,
+      total_requerimiento: 0,
+      total_recepcion_almacen: 0
+    }));
+  }, [historicoReal]);
   
   const handleRecalcular = () => {
     sincronizar(true); // Forzar recálculo
@@ -296,7 +281,7 @@ export default function DashboardPage() {
   // Calcular proyección (basado en tendencia)
   const costoProyectado = historicoMensual && historicoMensual.length > 0
     ? (historicoMensual[historicoMensual.length - 1].total_requerimiento ?? 0) * 1.15 // Proyección conservadora
-    : (datos.total_requerimiento ?? 0) * 1.15;
+    : datos.total_requerimiento * 1.15;
 
   return (
     <div className="space-y-3">
@@ -427,10 +412,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Columna izquierda: Presupuesto Meta + APU Meta */}
-        <div className="space-y-3">
-          {/* Presupuesto Meta */}
-          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden">
+          {/* Columna izquierda: Presupuesto Meta + APU Meta */}
+          <div className="space-y-3">
+            {/* Presupuesto Meta */}
+            <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden">
             <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)]">
               <div className="flex items-center gap-2">
                 {datos.id_presupuesto ? (
@@ -505,7 +490,7 @@ export default function DashboardPage() {
                       <span className="text-[11px] text-[var(--text-secondary)]">Promedio</span>
                     </div>
                     <div className="text-base font-bold text-[var(--text-primary)]">
-                      S/ {(datos.promedio_por_presupuesto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      S/ {(datos.promedio_por_presupuesto ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
                   
@@ -515,7 +500,7 @@ export default function DashboardPage() {
                       <span className="text-[11px] text-[var(--text-secondary)]">Más Alto</span>
                     </div>
                     <div className="text-base font-bold text-[var(--text-primary)]">
-                      S/ {(datos.presupuesto_mas_alto || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      S/ {(datos.presupuesto_mas_alto ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
                   
@@ -525,7 +510,7 @@ export default function DashboardPage() {
                       <span className="text-[11px] text-[var(--text-secondary)]">Más Bajo</span>
                     </div>
                     <div className="text-base font-bold text-[var(--text-primary)]">
-                      S/ {(datos.presupuesto_mas_bajo || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      S/ {(datos.presupuesto_mas_bajo ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   </div>
                 </div>
@@ -635,8 +620,7 @@ export default function DashboardPage() {
           </div>
           <div className="p-3">
             {/* Gráfico de líneas simple */}
-            {historicoMensual && historicoMensual.length > 0 && (
-              <div className="mb-6">
+            <div className="mb-6">
                 <div className="h-64 relative border-b-2 border-l-2 border-[var(--border-color)] bg-[var(--card-bg)] rounded">
                   {/* Eje Y - Valores */}
                   <div className="absolute left-0 top-0 bottom-0 w-14 flex flex-col justify-between text-[11px] text-[var(--text-secondary)] pr-2 items-end">
@@ -657,7 +641,7 @@ export default function DashboardPage() {
                     </div>
                     
                     {/* Líneas del gráfico usando SVG */}
-                    {historicoMensual && historicoMensual.length > 0 && (() => {
+                    {(() => {
                       const historico = historicoMensual;
                       const divisor = historico.length > 1 ? historico.length - 1 : 1; // Evitar división por cero
                       
@@ -718,15 +702,13 @@ export default function DashboardPage() {
                     })()}
                     
                     {/* Eje X - Meses */}
-                    {historicoMensual && historicoMensual.length > 0 && (
-                      <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[11px] text-[var(--text-secondary)] px-1 pb-1">
-                        {historicoMensual.map((item: HistoricoMensualItem, idx: number) => (
-                          <span key={idx} className={idx % 2 === 0 ? 'opacity-100' : 'opacity-0'}>
-                            {item.mes}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[11px] text-[var(--text-secondary)] px-1 pb-1">
+                      {historicoMensual.map((item: HistoricoMensualItem, idx: number) => (
+                        <span key={idx} className={idx % 2 === 0 ? 'opacity-100' : 'opacity-0'}>
+                          {item.mes}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 
@@ -750,7 +732,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-            )}
             
             {/* Resumen de valores */}
             <div className="grid grid-cols-3 gap-2 text-center">
