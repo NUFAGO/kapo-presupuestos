@@ -78,10 +78,13 @@ function ProyectosContent() {
   // Opciones para el filtro de estado
   const opcionesEstados = useMemo(() => [
     { value: '', label: 'Todos los estados' },
-    { value: 'ACTIVO', label: 'Activo' },
-    { value: 'INACTIVO', label: 'Inactivo' },
-    { value: 'EN_PROCESO', label: 'En Proceso' },
-    { value: 'FINALIZADO', label: 'Finalizado' },
+    { value: 'BORRADOR', label: 'Borrador' },
+    { value: 'EN_REVISION', label: 'En Revisión' },
+    { value: 'APROBADO', label: 'Aprobado' },
+    { value: 'EN_PROGRESO', label: 'En Progreso' },
+    { value: 'SUSPENDIDO', label: 'Suspendido' },
+    { value: 'COMPLETADO', label: 'Completado' },
+    { value: 'CANCELADO', label: 'Cancelado' },
   ], []);
 
   const handleOpenModal = () => {
@@ -102,6 +105,11 @@ function ProyectosContent() {
     }
     // Navegar a la página de detalles del proyecto
     router.push(`/proyectos/${proyecto.id_proyecto}`);
+  };
+
+  const handleEditProyecto = (proyecto: Proyecto) => {
+    setSelectedProyecto(proyecto);
+    setIsModalOpen(true);
   };
 
   const handleCloseDetailModal = () => {
@@ -240,6 +248,7 @@ function ProyectosContent() {
                 key={proyecto.id_proyecto}
                 proyecto={proyecto}
                 onClick={() => handleProyectoClick(proyecto)}
+                onEdit={() => handleEditProyecto(proyecto)}
               />
             ))}
 
@@ -301,7 +310,9 @@ function ProyectosContent() {
         <ProyectoForm
           proyecto={selectedProyecto || undefined}
           editMode={!!selectedProyecto}
-          onSubmit={(proyecto) => {
+          onSubmit={async (proyecto) => {
+            // El ProyectoForm ya maneja la mutación internamente
+            // Solo cerramos el modal después de que se complete
             handleCloseModal();
           }}
           onCancel={handleCloseModal}

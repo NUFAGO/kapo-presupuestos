@@ -202,13 +202,12 @@ export default function ProyectoForm({
               disabled={isSubmitting}
               options={[
                 { value: 'BORRADOR', label: 'BORRADOR' },
-                { value: 'EN REVISIÓN', label: 'EN REVISIÓN' },
+                { value: 'EN_REVISION', label: 'EN REVISIÓN' },
                 { value: 'APROBADO', label: 'APROBADO' },
-                { value: 'EN CURSO', label: 'EN CURSO' },
+                { value: 'EN_PROGRESO', label: 'EN PROGRESO' },
                 { value: 'SUSPENDIDO', label: 'SUSPENDIDO' },
-                { value: 'CANCELADO', label: 'CANCELADO' },
                 { value: 'COMPLETADO', label: 'COMPLETADO' },
-                { value: 'CERRADO', label: 'CERRADO' },
+                { value: 'CANCELADO', label: 'CANCELADO' },
               ]}
               placeholder="Seleccione estado"
             />

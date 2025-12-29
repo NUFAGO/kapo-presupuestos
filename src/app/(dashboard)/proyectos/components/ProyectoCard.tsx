@@ -1,14 +1,15 @@
 'use client';
 
-import { Calendar, DollarSign } from 'lucide-react';
+import { Calendar, DollarSign, Settings } from 'lucide-react';
 import type { Proyecto } from '@/services/proyecto-service';
 
 interface ProyectoCardProps {
   proyecto: Proyecto;
   onClick: () => void;
+  onEdit?: () => void;
 }
 
-export default function ProyectoCard({ proyecto, onClick }: ProyectoCardProps) {
+export default function ProyectoCard({ proyecto, onClick, onEdit }: ProyectoCardProps) {
   // Generar un color único para cada card basado en el ID del proyecto
   // Colores más notorios para diferenciar visualmente
   const colorClasses = [
@@ -76,20 +77,42 @@ export default function ProyectoCard({ proyecto, onClick }: ProyectoCardProps) {
           </div>
         </div>
 
-        <div className="ml-4">
+        <div className="ml-4 flex items-center gap-2">
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-              proyecto.estado === 'ACTIVO'
-                ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                : proyecto.estado === 'EN_PROCESO'
+              proyecto.estado === 'BORRADOR'
+                ? 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
+                : proyecto.estado === 'EN_REVISION'
                 ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
-                : proyecto.estado === 'FINALIZADO'
+                : proyecto.estado === 'APROBADO'
                 ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                : proyecto.estado === 'EN_PROGRESO'
+                ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                : proyecto.estado === 'SUSPENDIDO'
+                ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                : proyecto.estado === 'COMPLETADO'
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                : proyecto.estado === 'CANCELADO'
+                ? 'bg-red-500/10 text-red-600 dark:text-red-400'
                 : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
             }`}
           >
-            {proyecto.estado}
+            {proyecto.estado === 'EN_REVISION' ? 'EN REVISIÓN' : 
+             proyecto.estado === 'EN_PROGRESO' ? 'EN PROGRESO' : 
+             proyecto.estado}
           </span>
+          {onEdit && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="h-5 w-5 p-0 flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              title="Editar proyecto"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </div>
