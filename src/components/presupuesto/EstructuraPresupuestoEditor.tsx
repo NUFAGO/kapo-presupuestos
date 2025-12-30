@@ -3193,7 +3193,7 @@ export default function EstructuraPresupuestoEditor({
             {nombrePresupuestoReal}
             {estructuraData?.presupuesto?.total_presupuesto !== undefined && (
               <span className="ml-2 font-semibold text-[var(--text-primary)]">
-                Total: S/ {estructuraData.presupuesto.total_presupuesto.toFixed(2)}
+                Total: S/ {estructuraData.presupuesto.total_presupuesto.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
               </span>
             )}
           </span>
@@ -3462,7 +3462,7 @@ export default function EstructuraPresupuestoEditor({
                       <span>Parcial</span>
                       {estructuraData?.presupuesto?.parcial_presupuesto !== undefined && (
                         <span className="text-xs text-purple-800 dark:text-purple-400 font-semibold mt-0">
-                          S/{estructuraData.presupuesto.parcial_presupuesto.toFixed(2)}
+                          S/{estructuraData.presupuesto.parcial_presupuesto.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                         </span>
                       )}
                     </div>
@@ -3529,9 +3529,10 @@ export default function EstructuraPresupuestoEditor({
                                 style={{ paddingLeft: `${(calcularNivelDinamico(titulo.id_titulo) - 1) * 12}px` }}
                               >
                                 {titulo.descripcion}
-                                <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
+                                {/* Comentado temporalmente - puede ser útil para debugging en el futuro */}
+                                {/* <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
                                   [{titulo.orden}]
-                                </span>
+                                </span> */}
                               </span>
                             </div>
                           </td>
@@ -3553,7 +3554,7 @@ export default function EstructuraPresupuestoEditor({
 
                           {/* Parcial */}
                           <td className={`px-2 py-1 text-right whitespace-nowrap ${getColorPorNivel(titulo.id_titulo, titulo.tipo)}`}>
-                            <span className="text-xs">S/ {titulo.total_parcial.toFixed(2)}</span>
+                            <span className="text-xs">S/ {titulo.total_parcial.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
                           </td>
                         </tr>
                       </React.Fragment>
@@ -3605,9 +3606,10 @@ export default function EstructuraPresupuestoEditor({
                               }}
                             >
                               {partida.descripcion}
-                              <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
+                              {/* Comentado temporalmente - puede ser útil para debugging en el futuro */}
+                              {/* <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
                                 [{partida.orden}]
-                              </span>
+                              </span> */}
                             </span>
                           </div>
                         </td>
@@ -3648,19 +3650,19 @@ export default function EstructuraPresupuestoEditor({
                               className={`text-xs ${modo === 'edicion' ? 'text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}
                               title={modo === 'edicion' ? 'Clic para editar' : ''}
                             >
-                              {partida.metrado.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {partida.metrado.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
                             </span>
                           )}
                         </td>
 
                         {/* Precio */}
                         <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
-                          <span className="text-xs text-[var(--text-secondary)]">S/ {partida.precio_unitario.toFixed(2)}</span>
+                          <span className="text-xs text-[var(--text-secondary)]">S/ {partida.precio_unitario.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
                         </td>
 
                         {/* Parcial */}
                         <td className="px-2 py-1 text-right whitespace-nowrap">
-                          <span className="text-xs text-[var(--text-primary)]">S/ {partida.parcial_partida.toFixed(2)}</span>
+                          <span className="text-xs text-[var(--text-primary)]">S/ {partida.parcial_partida.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
                         </td>
                       </tr>
                     );

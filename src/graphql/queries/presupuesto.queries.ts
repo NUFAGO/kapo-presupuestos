@@ -262,6 +262,8 @@ export const GET_ESTRUCTURA_PRESUPUESTO_QUERY = `
         recurso_id
         precio
       }
+      porcentaje_igv_padre
+      porcentaje_utilidad_padre
     }
   }
 `;

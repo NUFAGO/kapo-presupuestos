@@ -223,6 +223,8 @@ export interface EstructuraPresupuesto {
   partidas: PartidaEstructura[];
   apus?: APUEstructura[]; // NUEVO: APUs completos para cálculos en frontend
   precios_compartidos?: PrecioCompartidoEstructura[]; // NUEVO: Precios compartidos para cálculos en frontend
+  porcentaje_igv_padre?: number | null; // Porcentajes del presupuesto padre para cálculos
+  porcentaje_utilidad_padre?: number | null; // Porcentajes del presupuesto padre para cálculos
 }
 
 /**
@@ -390,12 +392,25 @@ export function useEstructuraPresupuesto(id_presupuesto: string | null) {
         );
       }
 
-      // Calcular total_presupuesto (parcial + IGV + utilidad)
-      const porcentajeIGV = estructura.presupuesto.porcentaje_igv || 0;
-      const porcentajeUtilidad = estructura.presupuesto.porcentaje_utilidad || 0;
-      const montoIGV = Math.round(parcialPresupuesto * porcentajeIGV / 100 * 100) / 100;
+      // Calcular total_presupuesto según estándar tributario peruano:
+      // 1. Utilidad sobre costo directo (parcialPresupuesto)
+      // 2. Subtotal (precio de venta) = costo directo + utilidad
+      // 3. IGV sobre el subtotal (precio de venta)
+      // 4. Total = subtotal + IGV
+      // IMPORTANTE: Usar porcentajes del presupuesto padre (vienen en la estructura)
+      // Si están disponibles porcentaje_igv_padre y porcentaje_utilidad_padre, usarlos
+      // Si no, usar los del presupuesto actual (para presupuestos padre o antiguos)
+      const porcentajeIGV = estructura.porcentaje_igv_padre !== undefined && estructura.porcentaje_igv_padre !== null
+        ? estructura.porcentaje_igv_padre
+        : (estructura.presupuesto.porcentaje_igv || 0);
+      const porcentajeUtilidad = estructura.porcentaje_utilidad_padre !== undefined && estructura.porcentaje_utilidad_padre !== null
+        ? estructura.porcentaje_utilidad_padre
+        : (estructura.presupuesto.porcentaje_utilidad || 0);
+      
       const montoUtilidad = Math.round(parcialPresupuesto * porcentajeUtilidad / 100 * 100) / 100;
-      const totalPresupuesto = Math.round((parcialPresupuesto + montoIGV + montoUtilidad) * 100) / 100;
+      const subtotalVenta = Math.round((parcialPresupuesto + montoUtilidad) * 100) / 100;
+      const montoIGV = Math.round(subtotalVenta * porcentajeIGV / 100 * 100) / 100;
+      const totalPresupuesto = Math.round((subtotalVenta + montoIGV) * 100) / 100;
 
       return {
         ...estructura,
@@ -502,8 +517,15 @@ export function useUpdatePresupuestoPadre() {
       return response.actualizarPresupuestoPadre;
     },
     onSuccess: (presupuesto) => {
+      // Invalidar queries de presupuestos (para actualizar cards y listas)
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto'] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      
+      // IMPORTANTE: Invalidar todas las queries de estructura-presupuesto
+      // Esto asegura que la vista de estructura se actualice automáticamente
+      // cuando se cambian los porcentajes (tanto para el padre como para todos los hijos)
+      queryClient.invalidateQueries({ queryKey: ['estructura-presupuesto'] });
+      
       toast.success('Presupuesto actualizado exitosamente');
     },
     onError: (error: any) => {
