@@ -19,7 +19,7 @@ export function usePageState(pageKey: string) {
   const updateURL = useCallback((updates: Record<string, string | number | null>) => {
     // Crear nuevos params desde los actuales para preservar los que no se están actualizando
     const params = new URLSearchParams(searchParams.toString());
-    
+
     Object.entries(updates).forEach(([key, value]) => {
       if (value === null || value === '' || (key === 'page' && value === 1)) {
         // Eliminar parámetros vacíos o con valores por defecto
@@ -29,10 +29,10 @@ export function usePageState(pageKey: string) {
       }
     });
 
-    const newURL = params.toString() 
+    const newURL = params.toString()
       ? `${pathname}?${params.toString()}`
       : pathname;
-    
+
     router.replace(newURL, { scroll: false }); // scroll: false evita que se mueva el scroll
   }, [router, searchParams, pathname]);
 

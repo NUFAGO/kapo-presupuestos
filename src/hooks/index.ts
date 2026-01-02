@@ -33,6 +33,7 @@ export {
   usePresupuestosByProyecto,
   usePresupuesto,
   usePresupuestosPorFase,
+  useBuscarPresupuestosPlantillas,
   useCreateVersionDesdeVersion,
   usePasarAContractual,
   useCrearPresupuestoMetaDesdeContractual,

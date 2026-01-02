@@ -9,6 +9,7 @@ interface GrupoPresupuesto {
   id_grupo_version: string;
   presupuestoPadre: Presupuesto;
   versiones: Presupuesto[];
+  versionesMeta?: Presupuesto[]; // Versiones META relacionadas
 }
 
 interface ProyectoGrupoCardContractualProps {
@@ -17,8 +18,18 @@ interface ProyectoGrupoCardContractualProps {
 }
 
 export default function ProyectoGrupoCardContractual({ proyecto, gruposPresupuestos }: ProyectoGrupoCardContractualProps) {
+  // Verificaciones de seguridad
+  if (!proyecto || !gruposPresupuestos) {
+    return null;
+  }
+
+  // Para contractual: contar versiones CONTRACTUAL
+  const versionesContractual = gruposPresupuestos.flatMap(grupo =>
+    (grupo.versiones || []).filter(v => v.fase === 'CONTRACTUAL')
+  );
+
   const totalPresupuestos = gruposPresupuestos.length;
-  const totalVersiones = gruposPresupuestos.reduce((acc, grupo) => acc + grupo.versiones.length, 0);
+  const totalVersiones = versionesContractual.length;
 
   // Generar un color único para cada proyecto basado en el id_proyecto
   const colorClasses = [
@@ -31,9 +42,9 @@ export default function ProyectoGrupoCardContractual({ proyecto, gruposPresupues
     { bg: 'bg-indigo-500/40 dark:bg-indigo-400/40', hover: 'hover:bg-indigo-500/50 dark:hover:bg-indigo-400/50' },
     { bg: 'bg-emerald-500/40 dark:bg-emerald-400/40', hover: 'hover:bg-emerald-500/50 dark:hover:bg-emerald-400/50' },
   ];
-  
-  const colorIndex = proyecto.id_proyecto ? 
-    parseInt(proyecto.id_proyecto.toString().slice(-1), 10) % colorClasses.length : 
+
+  const colorIndex = proyecto.id_proyecto ?
+    parseInt(proyecto.id_proyecto.toString().slice(-1), 10) % colorClasses.length :
     Math.floor(Math.random() * colorClasses.length);
   
   const colorStyle = colorClasses[colorIndex];
@@ -72,6 +83,7 @@ export default function ProyectoGrupoCardContractual({ proyecto, gruposPresupues
             grupoId={grupo.id_grupo_version}
             presupuestoPadre={grupo.presupuestoPadre}
             versiones={grupo.versiones}
+            versionesMeta={grupo.versionesMeta}
             nombreProyecto={proyecto.nombre_proyecto}
           />
         ))}

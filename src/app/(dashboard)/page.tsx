@@ -154,7 +154,7 @@ export default function DashboardPage() {
     // Filtrar solo VERSIONES meta vigentes (no padres)
     // Deben ser versiones (version !== null, es_padre === false)
     // Con fase META y estado 'vigente' o 'aprobado'
-    const filtrados = presupuestosMeta
+    const filtrados = presupuestosMeta.data
       .filter(p => {
         const esVersion = p.version !== null && p.es_padre === false;
         const perteneceAlProyecto = p.id_proyecto === filtroProyectoUI;

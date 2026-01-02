@@ -2,18 +2,22 @@
 
 import { useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, X, Building2, FileText, Layers, Loader2 } from 'lucide-react';
+import { Search, X, Building2, FileText, Layers, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectSearch } from '@/components/ui/select-search';
 import { LoadingSpinner } from '@/components/ui';
-import { usePresupuestosPorFase } from '@/hooks/usePresupuestos';
+import { useProyectosConPresupuestosPorFase } from '@/hooks/usePresupuestos';
 import { useProyectos } from '@/hooks';
 import { usePageState } from '@/hooks/usePageState';
+import { executeQuery } from '@/services/graphql-client';
+import { LIST_PROYECTOS_PAGINATED_QUERY } from '@/graphql/queries/proyecto.queries';
+import { SelectSearchOption } from '@/components/ui/select-search';
 import PresupuestoGrupoCardMeta from './components/PresupuestoGrupoCardMeta';
 import ProyectoGrupoCardMeta from './components/ProyectoGrupoCardMeta';
+import Pagination from '../proyectos/components/Pagination';
 import type { Presupuesto } from '@/hooks/usePresupuestos';
-import type { Proyecto } from '@/services/proyecto-service';
+import type { Proyecto, PaginatedProyectoResponse } from '@/services/proyecto-service';
 
 interface GrupoPresupuesto {
   id_grupo_version: string;
@@ -26,139 +30,211 @@ interface ProyectoConPresupuestos {
   gruposPresupuestos: GrupoPresupuesto[];
 }
 
+const ITEMS_PER_PAGE = 15;
+
 function PresupuestosMetaContent() {
   const router = useRouter();
   const {
     searchQuery,
     filtroProyecto,
+    currentPage,
     setSearchQuery,
     setFiltroProyecto,
+    setCurrentPage,
     clearFilters,
   } = usePageState('meta');
 
-  // Obtener todos los proyectos para el filtro
+  // Obtener proyectos para el filtro (ahora optimizado con paginación escalable)
   const { data: proyectosData } = useProyectos({
     pagination: {
       page: 1,
-      limit: 1000,
+      limit: 100, // Suficiente para dropdown de filtros
       sortBy: 'nombre_proyecto',
       sortOrder: 'asc',
     },
   });
   const proyectos = proyectosData?.data || [];
 
-  // Preparar opciones para SelectSearch de proyectos
+  // Función de búsqueda de proyectos para SelectSearch
+  const buscarProyectos = async (searchTerm: string): Promise<SelectSearchOption[]> => {
+    try {
+      const response = await executeQuery<{ listProyectosPaginated: PaginatedProyectoResponse }>(
+        LIST_PROYECTOS_PAGINATED_QUERY,
+        {
+          input: {
+            pagination: { page: 1, limit: 50, sortBy: 'nombre_proyecto', sortOrder: 'asc' },
+            search: {
+              query: searchTerm,
+              fields: ['nombre_proyecto', 'cliente', 'empresa', 'id_proyecto']
+            }
+          }
+        }
+      );
+
+      return response.listProyectosPaginated.data.map(proyecto => ({
+        value: proyecto.id_proyecto,
+        label: proyecto.nombre_proyecto || 'Proyecto sin nombre'
+      }));
+    } catch (error) {
+      console.error('Error buscando proyectos:', error);
+      return [];
+    }
+  };
+
+  // Preparar opciones para SelectSearch de proyectos (primeros 100)
   const opcionesProyectos = useMemo(() => {
     return proyectos.map(proyecto => ({
       value: proyecto.id_proyecto,
-      label: proyecto.nombre_proyecto,
+      label: proyecto.nombre_proyecto || 'Proyecto sin nombre',
     }));
   }, [proyectos]);
 
-  // Obtener presupuestos en fase META (incluye padres y versiones)
+  // Obtener proyectos con presupuestos en fase META - CON búsqueda en backend
   const id_proyecto_filtrado = filtroProyecto || null;
-  const { data: presupuestos, isLoading, error } = usePresupuestosPorFase('META', id_proyecto_filtrado);
+  const { data: dataProyectos, isLoading, error } = useProyectosConPresupuestosPorFase(
+    'META',
+    id_proyecto_filtrado,
+    { page: currentPage, limit: ITEMS_PER_PAGE, sortBy: 'fecha_creacion', sortOrder: 'desc' },
+    searchQuery || null
+  );
+  const proyectosConPresupuestos = dataProyectos?.data || [];
+  const pagination = dataProyectos?.pagination;
+  const totals = dataProyectos?.totals;
 
-  // Agrupar presupuestos primero por proyecto, luego por id_grupo_version
-  // IMPORTANTE: Mostrar el padre aunque esté en otra fase (ej: CONTRACTUAL o META)
-  const proyectosConPresupuestos = useMemo(() => {
-    if (!presupuestos) return [];
+  // Los proyectos ya vienen con sus presupuestos agrupados del backend
+  // Solo necesitamos convertir el formato para mantener compatibilidad con los componentes
+  const proyectosConPresupuestosAgrupados = useMemo(() => {
+    if (!proyectosConPresupuestos) return [];
 
-    // Separar padres y versiones
-    const padres = presupuestos.filter((p) => p.es_padre && p.version === null);
-    const versiones = presupuestos.filter((p) => !p.es_padre || p.version !== null);
+    return proyectosConPresupuestos.map(proyectoData => {
+      // Obtener el proyecto completo de la lista de proyectos
+      const proyectoCompleto = proyectos.find(p => p.id_proyecto === proyectoData.id_proyecto);
 
-    // Crear mapa de grupos por id_grupo_version
-    // Incluir padres que tengan versiones META (aunque el padre esté en otra fase)
-    const gruposMap = new Map<string, GrupoPresupuesto>();
+      // Crear mapa de grupos por id_grupo_version
+      const gruposMap = new Map<string, GrupoPresupuesto>();
 
-    // Primero, buscar padres que tengan versiones META
-    versiones.forEach((version) => {
-      if (version.id_grupo_version && version.fase === 'META') {
-        const grupo = gruposMap.get(version.id_grupo_version);
-        if (!grupo) {
-          // Buscar el padre (puede estar en cualquier fase)
-          const padre = padres.find(p => p.id_grupo_version === version.id_grupo_version);
-          if (padre) {
-            gruposMap.set(version.id_grupo_version, {
-              id_grupo_version: version.id_grupo_version,
-              presupuestoPadre: padre,
-              versiones: [],
-            });
+      // Agrupar presupuestos por id_grupo_version
+      proyectoData.presupuestos.forEach((presupuesto) => {
+        if (presupuesto.id_grupo_version) {
+          const grupo = gruposMap.get(presupuesto.id_grupo_version);
+          if (!grupo) {
+            // Buscar el padre (puede estar en cualquier fase)
+            const padre = proyectoData.presupuestos.find(p =>
+              p.id_grupo_version === presupuesto.id_grupo_version &&
+              p.es_padre &&
+              p.version === null
+            );
+
+            if (padre) {
+              gruposMap.set(presupuesto.id_grupo_version, {
+                id_grupo_version: presupuesto.id_grupo_version,
+                presupuestoPadre: padre,
+                versiones: [],
+              });
+            }
           }
         }
-      }
-    });
+      });
 
-    // Luego, agregar las versiones META
-    versiones.forEach((version) => {
-      if (version.id_grupo_version && version.fase === 'META') {
-        const grupo = gruposMap.get(version.id_grupo_version);
-        if (grupo) {
-          grupo.versiones.push(version);
+      // Agregar versiones META a sus grupos
+      proyectoData.presupuestos.forEach((presupuesto) => {
+        if (presupuesto.id_grupo_version && presupuesto.fase === 'META' && !presupuesto.es_padre && presupuesto.version !== null) {
+          const grupo = gruposMap.get(presupuesto.id_grupo_version);
+          if (grupo) {
+            grupo.versiones.push(presupuesto);
+          }
         }
-      }
-    });
+      });
 
-    const grupos = Array.from(gruposMap.values());
-
-    // Ahora agrupar por proyecto
-    const proyectosMap = new Map<string, ProyectoConPresupuestos>();
-
-    grupos.forEach((grupo) => {
-      const idProyecto = grupo.presupuestoPadre.id_proyecto;
-      const proyecto = proyectosMap.get(idProyecto);
-
-      if (proyecto) {
-        proyecto.gruposPresupuestos.push(grupo);
-      } else {
-        const proyectoData = proyectos.find((p) => p.id_proyecto === idProyecto);
-        if (proyectoData) {
-          proyectosMap.set(idProyecto, {
-            proyecto: proyectoData,
-            gruposPresupuestos: [grupo],
-          });
-        }
-      }
-    });
-
-    return Array.from(proyectosMap.values());
-  }, [presupuestos, proyectos]);
-
-  // Filtrar proyectos y sus presupuestos por búsqueda
-  const proyectosFiltrados = useMemo(() => {
-    if (!proyectosConPresupuestos.length) return [];
-
-    let filtrados = proyectosConPresupuestos.map((proyectoConPresupuestos) => {
-      let gruposFiltrados = [...proyectoConPresupuestos.gruposPresupuestos];
-
-      // Filtro por búsqueda general (nombre de presupuesto, proyecto o ID)
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        gruposFiltrados = gruposFiltrados.filter(
-          (grupo) =>
-            grupo.presupuestoPadre.nombre_presupuesto.toLowerCase().includes(query) ||
-            grupo.presupuestoPadre.id_presupuesto.toLowerCase().includes(query) ||
-            grupo.versiones.some(
-              (v) =>
-                v.nombre_presupuesto.toLowerCase().includes(query) ||
-                v.id_presupuesto.toLowerCase().includes(query)
-            ) ||
-            proyectoConPresupuestos.proyecto.nombre_proyecto.toLowerCase().includes(query)
-        );
-      }
+      const gruposPresupuestos = Array.from(gruposMap.values());
 
       return {
-        ...proyectoConPresupuestos,
-        gruposPresupuestos: gruposFiltrados,
+        proyecto: proyectoCompleto || {
+          _id: '',
+          id_proyecto: proyectoData.id_proyecto,
+          nombre_proyecto: proyectoData.nombre_proyecto || 'Proyecto sin nombre',
+          // Agregar campos requeridos mínimos para evitar errores
+          id_usuario: '',
+          id_infraestructura: '',
+          id_departamento: '',
+          id_provincia: '',
+          id_distrito: '',
+          cliente: '',
+          empresa: '',
+          estado: 'BORRADOR' as const,
+          plazo: 0,
+          ppto_base: 0,
+          ppto_oferta: 0,
+          jornada: 0,
+          total_proyecto: 0,
+          fecha_creacion: new Date().toISOString(),
+          observaciones: ''
+        },
+        gruposPresupuestos,
       };
     });
+  }, [proyectosConPresupuestos, proyectos]);
 
-    // Filtrar proyectos que no tengan grupos después del filtrado
-    filtrados = filtrados.filter((p) => p.gruposPresupuestos.length > 0);
+  // Calcular totales generales para el resumen
+  const resumenGeneral = useMemo(() => {
+    const totalProyectos = proyectosConPresupuestosAgrupados.length;
+    const totalGrupos = proyectosConPresupuestosAgrupados.reduce((acc, proyecto) =>
+      acc + proyecto.gruposPresupuestos.length, 0
+    );
 
-    return filtrados;
-  }, [proyectosConPresupuestos, searchQuery]);
+    // Contar versiones META por estado
+    let totalVersiones = 0;
+    let versionesAprobadas = 0;
+    let versionesVigentes = 0;
+    let versionesPorAprobar = 0;
+
+    proyectosConPresupuestosAgrupados.forEach(proyecto => {
+      proyecto.gruposPresupuestos.forEach(grupo => {
+        const versionesMeta = grupo.versiones.filter(v => v.fase === 'META');
+        totalVersiones += versionesMeta.length;
+
+        versionesAprobadas += versionesMeta.filter(v => v.estado === 'aprobado').length;
+        versionesVigentes += versionesMeta.filter(v => v.estado === 'vigente').length;
+        versionesPorAprobar += versionesMeta.filter(v =>
+          v.estado === 'borrador' || v.estado === 'en_revision'
+        ).length;
+      });
+    });
+
+    return {
+      totalProyectos,
+      totalGrupos,
+      totalVersiones,
+      versionesAprobadas,
+      versionesVigentes,
+      versionesPorAprobar
+    };
+  }, [proyectosConPresupuestosAgrupados]);
+
+  // Los datos ya vienen filtrados del backend por búsqueda
+  // Solo agrupamos por proyecto (sin filtrado adicional en frontend)
+  const proyectosFiltrados = proyectosConPresupuestosAgrupados;
+
+  // Calcular estadísticas
+  const estadisticas = useMemo(() => {
+    const totalProyectos = proyectosFiltrados.length;
+    const totalGrupos = proyectosFiltrados.reduce((acc, proyecto) =>
+      acc + proyecto.gruposPresupuestos.length, 0
+    );
+
+    // Para META: contar todas las versiones META
+    const totalVersiones = proyectosFiltrados.reduce((acc, proyecto) =>
+      acc + proyecto.gruposPresupuestos.reduce((accGrupo, grupo) =>
+        accGrupo + grupo.versiones.filter(v => v.fase === 'META').length, 0
+      ), 0
+    );
+
+    return {
+      totalProyectos,
+      totalGrupos,
+      totalVersiones
+    };
+  }, [proyectosFiltrados]);
 
   const hasActiveFilters = searchQuery || filtroProyecto;
 
@@ -166,15 +242,16 @@ function PresupuestosMetaContent() {
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-      <div>
+        <div>
           <h1 className="text-lg font-semibold text-[var(--text-primary)]">
-          Presupuestos Meta
-        </h1>
+            Presupuestos Meta
+          </h1>
           <p className="text-xs text-[var(--text-secondary)]">
             Gestión de presupuestos agrupados por proyecto en fase meta
           </p>
         </div>
       </div>
+
 
       {/* Barra de búsqueda y filtros */}
       <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-4">
@@ -187,7 +264,10 @@ function PresupuestosMetaContent() {
                 type="text"
                 placeholder="Buscar por nombre de presupuesto, proyecto o ID..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  // setCurrentPage(1) ya se hace dentro de setSearchQuery
+                }}
                 className="pl-10 text-xs h-8"
               />
             </div>
@@ -201,6 +281,8 @@ function PresupuestosMetaContent() {
               options={opcionesProyectos}
               placeholder="Buscar por proyecto..."
               className="h-8 text-xs"
+              onSearch={buscarProyectos}
+              minCharsForSearch={2}
             />
           </div>
 
@@ -219,6 +301,42 @@ function PresupuestosMetaContent() {
         </div>
       </div>
 
+      {/* Estadísticas */}
+      {!isLoading && !error && proyectosFiltrados.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-3 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <Building2 className="h-4 w-4" />
+            <span>
+              <span className="font-semibold text-[var(--text-primary)]">{estadisticas.totalProyectos}</span> proyecto{estadisticas.totalProyectos !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-3 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <Layers className="h-4 w-4" />
+            <span>
+              <span className="font-semibold text-[var(--text-primary)]">{estadisticas.totalGrupos}</span> presupuesto{estadisticas.totalGrupos !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-3 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <span>
+              <span className="font-semibold text-green-600 dark:text-green-400">{resumenGeneral.versionesAprobadas}</span> aprobada{resumenGeneral.versionesAprobadas !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-3 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span>
+              <span className="font-semibold text-blue-600 dark:text-blue-400">{resumenGeneral.versionesVigentes}</span> vigente{resumenGeneral.versionesVigentes !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-3 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <span>
+              <span className="font-semibold text-orange-600 dark:text-orange-400">{resumenGeneral.versionesPorAprobar}</span> por aprobar
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Listado de proyectos con sus presupuestos */}
       <div className="space-y-3">
         {isLoading ? (
@@ -233,13 +351,26 @@ function PresupuestosMetaContent() {
             <p className="text-xs text-red-500">Error al cargar los presupuestos</p>
           </div>
         ) : proyectosFiltrados.length > 0 ? (
-          proyectosFiltrados.map((proyectoConPresupuestos) => (
-            <ProyectoGrupoCardMeta
-              key={proyectoConPresupuestos.proyecto.id_proyecto}
-              proyecto={proyectoConPresupuestos.proyecto}
-              gruposPresupuestos={proyectoConPresupuestos.gruposPresupuestos}
-            />
-          ))
+          <>
+            {proyectosFiltrados.map((proyectoConPresupuestos) => (
+              <ProyectoGrupoCardMeta
+                key={proyectoConPresupuestos.proyecto.id_proyecto}
+                proyecto={proyectoConPresupuestos.proyecto}
+                gruposPresupuestos={proyectoConPresupuestos.gruposPresupuestos}
+              />
+            ))}
+            
+            {/* Paginación */}
+            {pagination && pagination.totalPages > 1 && (
+              <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow">
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            )}
+          </>
         ) : (
           <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow p-12 text-center">
             <p className="text-xs text-[var(--text-secondary)]">

@@ -30,6 +30,10 @@ export const GET_PRESUPUESTOS_BY_PROYECTO_QUERY = `
       id_presupuesto_base
       id_presupuesto_licitacion
       version_licitacion_aprobada
+      id_presupuesto_contractual
+      version_contractual_aprobada
+      id_presupuesto_meta_vigente
+      version_meta_vigente
       estado
       estado_aprobacion {
         tipo
@@ -70,6 +74,10 @@ export const GET_PRESUPUESTO_QUERY = `
       id_presupuesto_base
       id_presupuesto_licitacion
       version_licitacion_aprobada
+      id_presupuesto_contractual
+      version_contractual_aprobada
+      id_presupuesto_meta_vigente
+      version_meta_vigente
       estado
       estado_aprobacion {
         tipo
@@ -110,6 +118,10 @@ export const LIST_PRESUPUESTOS_QUERY = `
       id_presupuesto_base
       id_presupuesto_licitacion
       version_licitacion_aprobada
+      id_presupuesto_contractual
+      version_contractual_aprobada
+      id_presupuesto_meta_vigente
+      version_meta_vigente
       estado
       estado_aprobacion {
         tipo
@@ -122,42 +134,180 @@ export const LIST_PRESUPUESTOS_QUERY = `
   }
 `;
 
-export const GET_PRESUPUESTOS_POR_FASE_QUERY = `
-  query GetPresupuestosPorFaseYEstado($fase: FasePresupuesto!, $estado: EstadoPresupuesto, $id_proyecto: String) {
-    getPresupuestosPorFaseYEstado(fase: $fase, estado: $estado, id_proyecto: $id_proyecto) {
-      _id
-      id_presupuesto
-      id_proyecto
-      nombre_presupuesto
-      costo_directo
-      monto_igv
-      monto_utilidad
-      parcial_presupuesto
-      total_presupuesto
-      porcentaje_igv
-      porcentaje_utilidad
-      plazo
-      ppto_base
-      ppto_oferta
-      fecha_creacion
-      observaciones
-      numeracion_presupuesto
-      fase
-      version
-      descripcion_version
-      es_padre
-      id_grupo_version
-      id_presupuesto_base
-      id_presupuesto_licitacion
-      version_licitacion_aprobada
-      estado
-      estado_aprobacion {
-        tipo
+export const GET_PRESUPUESTOS_PAGINATED_QUERY = `
+  query GetPresupuestosPaginated($fases: [FasePresupuesto!], $estados: [EstadoPresupuesto!], $incluirEstadosNull: Boolean, $pagination: PaginationInput, $search: SearchInput) {
+    getPresupuestosPaginated(fases: $fases, estados: $estados, incluirEstadosNull: $incluirEstadosNull, pagination: $pagination, search: $search) {
+      data {
+        _id
+        id_presupuesto
+        id_proyecto
+        nombre_presupuesto
+        costo_directo
+        monto_igv
+        monto_utilidad
+        parcial_presupuesto
+        total_presupuesto
+        porcentaje_igv
+        porcentaje_utilidad
+        plazo
+        ppto_base
+        ppto_oferta
+        fecha_creacion
+        observaciones
+        numeracion_presupuesto
+        fase
+        version
+        descripcion_version
+        es_padre
+        id_grupo_version
+        id_presupuesto_base
+        id_presupuesto_licitacion
+        version_licitacion_aprobada
+        id_presupuesto_contractual
+        version_contractual_aprobada
+        id_presupuesto_meta_vigente
+        version_meta_vigente
         estado
-        id_aprobacion
+        estado_aprobacion {
+          tipo
+          estado
+          id_aprobacion
+        }
+        es_inmutable
+        es_activo
       }
-      es_inmutable
-      es_activo
+      pagination {
+        page
+        limit
+        total
+        totalPages
+        hasNext
+        hasPrev
+      }
+    }
+  }
+`;
+
+export const GET_PRESUPUESTOS_POR_FASE_QUERY = `
+  query GetPresupuestosPorFaseYEstado($fase: FasePresupuesto!, $estado: EstadoPresupuesto, $id_proyecto: String, $pagination: PaginationInput, $search: SearchInput) {
+    getPresupuestosPorFaseYEstado(fase: $fase, estado: $estado, id_proyecto: $id_proyecto, pagination: $pagination, search: $search) {
+      data {
+        _id
+        id_presupuesto
+        id_proyecto
+        nombre_presupuesto
+        costo_directo
+        monto_igv
+        monto_utilidad
+        parcial_presupuesto
+        total_presupuesto
+        porcentaje_igv
+        porcentaje_utilidad
+        plazo
+        ppto_base
+        ppto_oferta
+        fecha_creacion
+        observaciones
+        numeracion_presupuesto
+        fase
+        version
+        descripcion_version
+        es_padre
+        id_grupo_version
+        id_presupuesto_base
+        id_presupuesto_licitacion
+        version_licitacion_aprobada
+        id_presupuesto_contractual
+        version_contractual_aprobada
+        id_presupuesto_meta_vigente
+        version_meta_vigente
+        estado
+        estado_aprobacion {
+          tipo
+          estado
+          id_aprobacion
+        }
+        es_inmutable
+        es_activo
+      }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+        hasNext
+        hasPrev
+      }
+      totals {
+        total_proyectos
+        total_presupuestos
+        total_grupos
+        total_versiones
+      }
+    }
+  }
+`;
+
+export const GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY = `
+  query GetProyectosConPresupuestosPorFase($fase: FasePresupuesto!, $estado: EstadoPresupuesto, $id_proyecto: String, $pagination: PaginationInput, $search: SearchInput) {
+    getProyectosConPresupuestosPorFase(fase: $fase, estado: $estado, id_proyecto: $id_proyecto, pagination: $pagination, search: $search) {
+      data {
+        id_proyecto
+        nombre_proyecto
+        presupuestos {
+          _id
+          id_presupuesto
+          id_proyecto
+          nombre_presupuesto
+          costo_directo
+          monto_igv
+          monto_utilidad
+          parcial_presupuesto
+          total_presupuesto
+          porcentaje_igv
+          porcentaje_utilidad
+          plazo
+          ppto_base
+          ppto_oferta
+          fecha_creacion
+          observaciones
+          numeracion_presupuesto
+          fase
+          version
+          descripcion_version
+          es_padre
+          id_grupo_version
+          id_presupuesto_base
+          id_presupuesto_licitacion
+          version_licitacion_aprobada
+          id_presupuesto_contractual
+          version_contractual_aprobada
+          id_presupuesto_meta_vigente
+          version_meta_vigente
+          estado
+          estado_aprobacion {
+            tipo
+            estado
+            id_aprobacion
+          }
+          es_inmutable
+          es_activo
+        }
+      }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+        hasNext
+        hasPrev
+      }
+      totals {
+        total_proyectos
+        total_presupuestos
+        total_grupos
+        total_versiones
+      }
     }
   }
 `;

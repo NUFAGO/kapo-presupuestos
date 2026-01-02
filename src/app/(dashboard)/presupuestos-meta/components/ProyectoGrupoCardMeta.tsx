@@ -17,8 +17,18 @@ interface ProyectoGrupoCardMetaProps {
 }
 
 export default function ProyectoGrupoCardMeta({ proyecto, gruposPresupuestos }: ProyectoGrupoCardMetaProps) {
+  // Para meta: contar versiones META activas y clasificar por estado
+  const versionesMeta = gruposPresupuestos.flatMap(grupo =>
+    grupo.versiones.filter(v => v.fase === 'META' && v.es_activo !== false)
+  );
+
+  const versionesAprobadas = versionesMeta.filter(v => v.estado === 'aprobado').length;
+  const versionesVigentes = versionesMeta.filter(v => v.estado === 'vigente').length;
+  const versionesPorAprobar = versionesMeta.filter(v =>
+    v.estado === 'borrador' || v.estado === 'en_revision'
+  ).length;
+
   const totalPresupuestos = gruposPresupuestos.length;
-  const totalVersiones = gruposPresupuestos.reduce((acc, grupo) => acc + grupo.versiones.length, 0);
 
   // Generar un color único para cada proyecto basado en el id_proyecto
   const colorClasses = [
@@ -57,7 +67,7 @@ export default function ProyectoGrupoCardMeta({ proyecto, gruposPresupuestos }: 
               </span>
               <span>•</span>
               <span>
-                <span className="font-medium text-[var(--text-primary)]">{totalVersiones}</span> versión{totalVersiones !== 1 ? 'es' : ''}
+                <span className="font-medium text-[var(--text-primary)]">{versionesMeta.length}</span> versión{versionesMeta.length !== 1 ? 'es' : ''}
               </span>
             </div>
           </div>

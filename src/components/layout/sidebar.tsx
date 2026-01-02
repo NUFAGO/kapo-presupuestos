@@ -18,7 +18,9 @@ import {
   CheckCircle2,
   DollarSign,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Receipt,
+  TrendingUp
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useState, useEffect } from 'react';
@@ -27,12 +29,13 @@ import { useRouter } from 'next/navigation';
 interface NavSubItem {
   name: string;
   href: string;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 interface NavItem {
   name: string;
   href?: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
   subItems?: NavSubItem[];
 }
 
@@ -43,37 +46,42 @@ const navItems: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    name: 'Proyectos',
-    href: '/proyectos',
-    icon: FolderKanban,
-  },
-  {
-    name: 'Licitaciones',
-    href: '/presupuestos-licitaciones',
-    icon: Gavel,
-  },
-  {
-    name: 'Contractuales',
-    href: '/presupuestos-contractuales',
-    icon: FileCheck,
-  },
-  {
-    name: 'Presupuestos Meta',
-    href: '/presupuestos-meta',
-    icon: Target,
-  },
-  {
-    name: 'Aprobaciones',
-    href: '/presupuestos-aprobacion',
-    icon: CheckCircle2,
+    name: 'Presupuestos',
+    subItems: [
+      {
+        name: 'Proyectos',
+        href: '/proyectos',
+        icon: FolderKanban,
+      },
+      {
+        name: 'Licitaciones',
+        href: '/presupuestos-licitaciones',
+        icon: Gavel,
+      },
+      {
+        name: 'Contractuales',
+        href: '/presupuestos-contractuales',
+        icon: FileCheck,
+      },
+      {
+        name: 'Presupuestos Meta',
+        href: '/presupuestos-meta',
+        icon: Target,
+      },
+      {
+        name: 'Aprobaciones',
+        href: '/presupuestos-aprobacion',
+        icon: CheckCircle2,
+      },
+    ],
   },
   {
     name: 'Costos',
-    icon: DollarSign,
     subItems: [
       {
         name: 'Control Costos',
         href: '/costos/control-costos',
+        icon: TrendingUp,
       },
     ],
   },
@@ -86,7 +94,8 @@ export function Sidebar() {
   const { logout } = useAuth();
   const router = useRouter();
   const [isMobile, setIsMobile] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  // Iniciar con "Presupuestos" y "Costos" expandidos por defecto
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set(['Presupuestos', 'Costos']));
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -227,6 +236,43 @@ export function Sidebar() {
               if (hasSubItems) {
                 const hasActiveSubItem = item.subItems!.some((subItem) => isRouteActive(subItem.href));
                 
+                // Cuando está colapsado, mostrar directamente los subItems (sin el grupo padre)
+                if (isCollapsed && !isMobile) {
+                  return (
+                    <div key={item.name} className="flex flex-col">
+                      {item.subItems!.map((subItem) => {
+                        const SubIcon = subItem.icon;
+                        const subActive = isRouteActive(subItem.href);
+                        return (
+                          <Link
+                            key={subItem.href}
+                            href={subItem.href}
+                            className={clsx(
+                              'flex items-center justify-center px-3 py-2 rounded-md text-xs font-medium relative transition-all duration-300 ease-in-out sidebar-nav-item group',
+                              {
+                                'bg-[var(--sidebar-active-bg-light)] text-[var(--sidebar-active-text-light)] sidebar-nav-item-active border-l-[3px] border-[var(--sidebar-active-bg)]': subActive,
+                                'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--text-primary)]': !subActive,
+                              }
+                            )}
+                            title={subItem.name}
+                          >
+                            {SubIcon && (
+                              <SubIcon className={clsx(
+                                'w-5 h-5 flex-shrink-0 transition-all duration-300 ease-in-out',
+                                {
+                                  'text-[var(--sidebar-active-text-light)]': subActive,
+                                  'text-[var(--text-secondary)] group-hover:scale-110 group-hover:text-[var(--text-primary)]': !subActive,
+                                }
+                              )} />
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+                
+                // Cuando está expandido, mostrar el grupo padre con subItems
                 return (
                   <div key={item.name} className="flex flex-col">
                     <button
@@ -240,34 +286,31 @@ export function Sidebar() {
                         {
                           'bg-[var(--sidebar-active-bg-light)] text-[var(--sidebar-active-text-light)] sidebar-nav-item-active border-l-[3px] border-[var(--sidebar-active-bg)]': hasActiveSubItem,
                           'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--text-primary)]': !hasActiveSubItem,
-                          'justify-center': isCollapsed && !isMobile,
                         }
                       )}
-                      title={isCollapsed && !isMobile ? item.name : undefined}
                     >
-                      <Icon className={clsx(
-                        'w-5 h-5 flex-shrink-0 transition-all duration-300 ease-in-out',
-                        {
-                          'text-[var(--sidebar-active-text-light)]': hasActiveSubItem,
-                          'text-[var(--text-secondary)] group-hover:scale-110 group-hover:text-[var(--text-primary)]': !hasActiveSubItem,
-                        }
-                      )} />
-                      {(!isCollapsed || isMobile) && (
-                        <>
-                          <span className="truncate transition-all duration-300 ease-in-out flex-1 text-left">{item.name}</span>
-                          {isExpanded ? (
-                            <ChevronDown className="w-4 h-4 flex-shrink-0" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 flex-shrink-0" />
-                          )}
-                        </>
+                      {Icon && (
+                        <Icon className={clsx(
+                          'w-5 h-5 flex-shrink-0 transition-all duration-300 ease-in-out',
+                          {
+                            'text-[var(--sidebar-active-text-light)]': hasActiveSubItem,
+                            'text-[var(--text-secondary)] group-hover:scale-110 group-hover:text-[var(--text-primary)]': !hasActiveSubItem,
+                          }
+                        )} />
+                      )}
+                      <span className="truncate transition-all duration-300 ease-in-out flex-1 text-left">{item.name}</span>
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 flex-shrink-0" />
                       )}
                     </button>
                     
                     {/* Subitems */}
-                    {(!isCollapsed || isMobile) && isExpanded && (
+                    {isExpanded && (
                       <div className="ml-4 mt-1 space-y-1">
                         {item.subItems!.map((subItem) => {
+                          const SubIcon = subItem.icon;
                           const subActive = isRouteActive(subItem.href);
                           return (
                             <Link
@@ -286,6 +329,15 @@ export function Sidebar() {
                                 }
                               )}
                             >
+                              {SubIcon && (
+                                <SubIcon className={clsx(
+                                  'w-4 h-4 flex-shrink-0 transition-all duration-300 ease-in-out',
+                                  {
+                                    'text-[var(--text-primary)]': subActive,
+                                    'text-[var(--text-secondary)] group-hover:scale-110 group-hover:text-[var(--text-primary)]': !subActive,
+                                  }
+                                )} />
+                              )}
                               <span className="truncate transition-all duration-300 ease-in-out">{subItem.name}</span>
                             </Link>
                           );
@@ -318,13 +370,15 @@ export function Sidebar() {
                   )}
                   title={isCollapsed && !isMobile ? item.name : undefined}
                 >
-                  <Icon className={clsx(
-                    'w-5 h-5 flex-shrink-0 transition-all duration-300 ease-in-out',
-                    {
-                      'text-[var(--sidebar-active-text-light)]': active,
-                      'text-[var(--text-secondary)] group-hover:scale-110 group-hover:text-[var(--text-primary)]': !active,
-                    }
-                  )} />
+                  {Icon && (
+                    <Icon className={clsx(
+                      'w-5 h-5 flex-shrink-0 transition-all duration-300 ease-in-out',
+                      {
+                        'text-[var(--sidebar-active-text-light)]': active,
+                        'text-[var(--text-secondary)] group-hover:scale-110 group-hover:text-[var(--text-primary)]': !active,
+                      }
+                    )} />
+                  )}
                   {(!isCollapsed || isMobile) && (
                     <span className="truncate transition-all duration-300 ease-in-out">{item.name}</span>
                   )}

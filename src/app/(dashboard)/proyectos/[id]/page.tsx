@@ -4,12 +4,15 @@ import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { LoadingSpinner } from '@/components/ui';
 import Modal from '@/components/ui/modal';
 import { useProyecto } from '@/hooks/useProyectos';
-import { usePresupuestosByProyecto, useCreatePresupuestoPadre } from '@/hooks/usePresupuestos';
+import { usePresupuestosByProyecto, useCreatePresupuestoPadre, useBuscarPresupuestosPlantillas } from '@/hooks/usePresupuestos';
 import PresupuestoCard from './components/PresupuestoCard';
 import ProyectoDetalles from './components/ProyectoDetalles';
 import PresupuestoForm from './components/PresupuestoForm';
+import type { Presupuesto } from '@/hooks/usePresupuestos';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -20,6 +23,10 @@ export default function ProyectoDetallePage({ params }: PageProps) {
   const router = useRouter();
   const id_proyecto = id;
   const [isPresupuestoModalOpen, setIsPresupuestoModalOpen] = useState(false);
+  const [usarPlantilla, setUsarPlantilla] = useState(false);
+  const [plantillaSeleccionada, setPlantillaSeleccionada] = useState<Presupuesto | null>(null);
+  const [busquedaPlantilla, setBusquedaPlantilla] = useState('');
+  const [filtroFasePlantilla, setFiltroFasePlantilla] = useState<'vigente' | 'todas' | 'META' | 'CONTRACTUAL' | 'LICITACION'>('vigente');
   const createPresupuestoPadre = useCreatePresupuestoPadre();
 
   // Función para volver a proyectos preservando los query params
@@ -38,6 +45,21 @@ export default function ProyectoDetallePage({ params }: PageProps) {
   
   // Consultar presupuestos del proyecto
   const { data: presupuestos = [], isLoading: isLoadingPresupuestos, error: errorPresupuestos } = usePresupuestosByProyecto(id_proyecto);
+
+
+  // Función para resetear el estado del modal
+  const resetModalState = () => {
+    setUsarPlantilla(false);
+    setPlantillaSeleccionada(null);
+    setBusquedaPlantilla('');
+    setFiltroFasePlantilla('vigente');
+  };
+
+  // Función para cerrar el modal con reset
+  const handleCloseModal = () => {
+    setIsPresupuestoModalOpen(false);
+    resetModalState();
+  };
 
   // Filtrar: En Proyectos mostramos todos los presupuestos del proyecto
   // Incluimos padres y versiones para poder detectar versiones ganadoras
@@ -195,14 +217,14 @@ export default function ProyectoDetallePage({ params }: PageProps) {
       {/* Modal para Crear Presupuesto */}
       <Modal
         isOpen={isPresupuestoModalOpen}
-        onClose={() => setIsPresupuestoModalOpen(false)}
+        onClose={handleCloseModal}
         title="Nuevo Presupuesto"
         size="lg"
         footer={
           <div className="flex justify-end gap-3">
             <button
               type="button"
-              onClick={() => setIsPresupuestoModalOpen(false)}
+              onClick={handleCloseModal}
               disabled={createPresupuestoPadre.isPending}
               className="px-4 py-2 rounded-lg bg-[var(--background)]/50 hover:bg-[var(--background)]/70 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -211,7 +233,7 @@ export default function ProyectoDetallePage({ params }: PageProps) {
             <button
               type="submit"
               form="presupuesto-form"
-              disabled={createPresupuestoPadre.isPending}
+              disabled={createPresupuestoPadre.isPending || (usarPlantilla && !plantillaSeleccionada)}
               className="px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-xs text-blue-600 dark:text-blue-400 shadow-sm hover:shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {createPresupuestoPadre.isPending ? 'Creando...' : 'Crear'}
@@ -220,26 +242,37 @@ export default function ProyectoDetallePage({ params }: PageProps) {
         }
       >
         <PresupuestoForm
-          id_proyecto={id_proyecto}
-          onSubmit={async (data) => {
-            try {
-              // Crear presupuesto padre con nombre, IGV y utilidad - se crea con fase BORRADOR por defecto
-              await createPresupuestoPadre.mutateAsync({
-                id_proyecto,
-                nombre_presupuesto: data.nombre_presupuesto,
-                porcentaje_igv: data.porcentaje_igv || 18,
-                porcentaje_utilidad: data.porcentaje_utilidad || 0
-              });
-              setIsPresupuestoModalOpen(false);
-            } catch (error) {
-              console.error('Error al crear presupuesto:', error);
-            }
-          }}
-          onCancel={() => setIsPresupuestoModalOpen(false)}
-          isLoading={createPresupuestoPadre.isPending}
-          cantidadPresupuestos={presupuestos.length}
-          modoCrearPadre={true}
-        />
+            id_proyecto={id_proyecto}
+            onSubmit={async (data) => {
+              try {
+                // Crear presupuesto padre con nombre, IGV y utilidad - se crea con fase BORRADOR por defecto
+                await createPresupuestoPadre.mutateAsync({
+                  id_proyecto,
+                  nombre_presupuesto: data.nombre_presupuesto,
+                  porcentaje_igv: data.porcentaje_igv || 18,
+                  porcentaje_utilidad: data.porcentaje_utilidad || 0,
+                  // TODO: Implementar funcionalidad de plantilla
+                  // ...(usarPlantilla && plantillaSeleccionada && {
+                  //   id_presupuesto_plantilla: plantillaSeleccionada.id_presupuesto
+                  // })
+                });
+                handleCloseModal();
+              } catch (error) {
+                console.error('Error al crear presupuesto:', error);
+              }
+            }}
+            onCancel={handleCloseModal}
+            isLoading={createPresupuestoPadre.isPending}
+            cantidadPresupuestos={presupuestos.length}
+            modoCrearPadre={true}
+            createPresupuestoPadrePending={createPresupuestoPadre.isPending}
+            usarPlantilla={usarPlantilla}
+            setUsarPlantilla={setUsarPlantilla}
+            plantillaSeleccionada={plantillaSeleccionada}
+            setPlantillaSeleccionada={setPlantillaSeleccionada}
+            filtroFasePlantilla={filtroFasePlantilla}
+            setFiltroFasePlantilla={setFiltroFasePlantilla}
+          />
       </Modal>
     </div>
   );

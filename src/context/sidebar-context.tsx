@@ -7,14 +7,21 @@ type SidebarContextType = {
   isMd: boolean;
   toggleSidebar: () => void;
   closeSidebar: () => void;
+  currentWidth: number;
+  breakpoint: number;
 };
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
+
+// BREAKPOINT CONFIGURABLE - Cambia este valor para ajustar cuando se comprime el sidebar
+// El sidebar se colapsará cuando el ancho sea menor a este valor (excepto en móvil)
+const SIDEBAR_BREAKPOINT = 1536; // px
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isMd, setIsMd] = useState(false);
+  const [currentWidth, setCurrentWidth] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
@@ -22,12 +29,14 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       const isMobileView = width < 768;
       const isMdView = width >= 768 && width < 1024;
       
+      setCurrentWidth(width);
       setIsMobile(isMobileView);
       setIsMd(isMdView);
       
       if (isMobileView) {
         setIsCollapsed(true);
-      } else if (isMdView) {
+      } else if (width < SIDEBAR_BREAKPOINT) {
+        // Se colapsa cuando el ancho es menor al breakpoint configurado
         setIsCollapsed(true);
       } else {
         setIsCollapsed(false);
@@ -76,7 +85,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SidebarContext.Provider value={{ isCollapsed, isMd, toggleSidebar, closeSidebar }}>
+    <SidebarContext.Provider value={{ isCollapsed, isMd, toggleSidebar, closeSidebar, currentWidth, breakpoint: SIDEBAR_BREAKPOINT }}>
       {children}
     </SidebarContext.Provider>
   );

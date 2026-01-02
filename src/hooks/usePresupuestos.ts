@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { executeQuery, executeMutation } from '@/services/graphql-client';
-import { GET_PRESUPUESTOS_BY_PROYECTO_QUERY, GET_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_QUERY, GET_PRESUPUESTOS_POR_FASE_QUERY } from '@/graphql/queries/presupuesto.queries';
+import { GET_PRESUPUESTOS_BY_PROYECTO_QUERY, GET_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_QUERY, GET_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY, LIST_PRESUPUESTOS_QUERY, GET_PRESUPUESTOS_PAGINATED_QUERY } from '@/graphql/queries/presupuesto.queries';
 import { ADD_PRESUPUESTO_MUTATION, UPDATE_PRESUPUESTO_MUTATION, DELETE_PRESUPUESTO_MUTATION, CREAR_PRESUPUESTO_PADRE_MUTATION, CREAR_VERSION_DESDE_PADRE_MUTATION, CREAR_VERSION_DESDE_VERSION_MUTATION, ENVIAR_A_LICITACION_MUTATION, PASAR_A_CONTRACTUAL_MUTATION, CREAR_PRESUPUESTO_META_DESDE_CONTRACTUAL_MUTATION, ACTUALIZAR_PRESUPUESTO_PADRE_MUTATION, ELIMINAR_GRUPO_PRESUPUESTO_COMPLETO_MUTATION, ENVIAR_VERSION_META_A_APROBACION_MUTATION, ENVIAR_VERSION_META_A_OFICIALIZACION_MUTATION } from '@/graphql/mutations/presupuesto.mutations';
 import { useAuth } from '@/context/auth-context';
 import toast from 'react-hot-toast';
@@ -40,6 +40,10 @@ export interface Presupuesto {
   id_presupuesto_base?: string;
   id_presupuesto_licitacion?: string;
   version_licitacion_aprobada?: number;
+  id_presupuesto_contractual?: string;
+  version_contractual_aprobada?: number;
+  id_presupuesto_meta_vigente?: string;
+  version_meta_vigente?: number;
   estado?: 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'vigente';
   estado_aprobacion?: {
     tipo: 'LICITACION_A_CONTRACTUAL' | 'CONTRACTUAL_A_META' | 'NUEVA_VERSION_META' | 'OFICIALIZAR_META' | null;
@@ -48,6 +52,12 @@ export interface Presupuesto {
   };
   es_inmutable?: boolean;
   es_activo?: boolean;
+}
+
+export interface ProyectoConPresupuestos {
+  id_proyecto: string;
+  nombre_proyecto: string | null; // Puede ser null según BD
+  presupuestos: Presupuesto[];
 }
 
 /**
@@ -105,22 +115,114 @@ export function usePresupuestosByProyecto(id_proyecto: string | null) {
  */
 export function usePresupuestosPorFase(
   fase: 'BORRADOR' | 'LICITACION' | 'CONTRACTUAL' | 'META',
-  id_proyecto?: string | null
+  id_proyecto?: string | null,
+  pagination?: { page: number; limit: number; sortBy?: string; sortOrder?: 'asc' | 'desc' },
+  searchQuery?: string | null
 ) {
   return useQuery({
-    queryKey: ['presupuestos', 'fase', fase, id_proyecto],
+    queryKey: ['presupuestos', 'fase', fase, id_proyecto, pagination?.page, pagination?.limit, searchQuery],
     queryFn: async () => {
-      const response = await executeQuery<{ getPresupuestosPorFaseYEstado: Presupuesto[] }>(
+      const search = searchQuery && searchQuery.trim()
+        ? { query: searchQuery.trim(), fields: ['nombre_presupuesto', 'id_presupuesto'] }
+        : null;
+
+      const response = await executeQuery<{
+        getPresupuestosPorFaseYEstado: {
+          data: Presupuesto[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+          };
+          totals: {
+            total_proyectos: number;
+            total_presupuestos: number;
+            total_grupos: number;
+            total_versiones: number;
+          };
+        }
+      }>(
         GET_PRESUPUESTOS_POR_FASE_QUERY,
         {
           fase,
           estado: null,
           id_proyecto: id_proyecto || null,
+          pagination: pagination || null,
+          search,
         }
       );
       // Normalizar todos los presupuestos (padres y versiones)
-      const presupuestosNormalizados = response.getPresupuestosPorFaseYEstado.map(normalizarPresupuesto);
-      return presupuestosNormalizados;
+      const presupuestosNormalizados = response.getPresupuestosPorFaseYEstado.data.map(normalizarPresupuesto);
+      return {
+        data: presupuestosNormalizados,
+        pagination: response.getPresupuestosPorFaseYEstado.pagination,
+        totals: response.getPresupuestosPorFaseYEstado.totals
+      };
+    },
+    staleTime: 30000, // 30 segundos
+  });
+}
+
+/**
+ * Hook para obtener proyectos con sus presupuestos por fase (más escalable)
+ * Pagina por proyectos, no por presupuestos individuales
+ */
+export function useProyectosConPresupuestosPorFase(
+  fase: 'BORRADOR' | 'LICITACION' | 'CONTRACTUAL' | 'META',
+  id_proyecto?: string | null,
+  pagination?: { page: number; limit: number; sortBy?: string; sortOrder?: 'asc' | 'desc' },
+  searchQuery?: string | null
+) {
+  return useQuery({
+    queryKey: ['proyectos-con-presupuestos', 'fase', fase, id_proyecto, pagination?.page, pagination?.limit, searchQuery],
+    queryFn: async () => {
+      const search = searchQuery && searchQuery.trim()
+        ? { query: searchQuery.trim(), fields: ['nombre_presupuesto', 'id_presupuesto'] }
+        : null;
+
+      const response = await executeQuery<{
+        getProyectosConPresupuestosPorFase: {
+          data: ProyectoConPresupuestos[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+          };
+          totals: {
+            total_proyectos: number;
+            total_presupuestos: number;
+            total_grupos: number;
+            total_versiones: number;
+          };
+        }
+      }>(
+        GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY,
+        {
+          fase,
+          estado: null,
+          id_proyecto: id_proyecto || null,
+          pagination: pagination || null,
+          search,
+        }
+      );
+
+      // Normalizar todos los presupuestos en cada proyecto
+      const proyectosNormalizados = response.getProyectosConPresupuestosPorFase.data.map(proyecto => ({
+        ...proyecto,
+        presupuestos: proyecto.presupuestos.map(normalizarPresupuesto)
+      }));
+
+      return {
+        data: proyectosNormalizados,
+        pagination: response.getProyectosConPresupuestosPorFase.pagination,
+        totals: response.getProyectosConPresupuestosPorFase.totals
+      };
     },
     staleTime: 30000, // 30 segundos
   });
@@ -489,6 +591,8 @@ export function useCreatePresupuestoPadre() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', variables.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       toast.success('Presupuesto creado exitosamente');
     },
     onError: (error: any) => {
@@ -518,8 +622,10 @@ export function useUpdatePresupuestoPadre() {
     },
     onSuccess: (presupuesto) => {
       // Invalidar queries de presupuestos (para actualizar cards y listas)
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto'] });
+      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', presupuesto.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       
       // IMPORTANTE: Invalidar todas las queries de estructura-presupuesto
       // Esto asegura que la vista de estructura se actualice automáticamente
@@ -551,6 +657,8 @@ export function useCreateVersionDesdePadre() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       toast.success('Versión 1 creada exitosamente');
     },
     onError: (error: any) => {
@@ -588,12 +696,9 @@ export function useCreateVersionDesdeVersion() {
         dismissCloningToast(context.cloningToastId);
       }
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase'] });
-      // Invalidar también la query específica de la fase del presupuesto creado
-      if (data.fase) {
-        queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', data.fase] });
-      }
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       queryClient.invalidateQueries({ queryKey: ['estructura', data.id_presupuesto] });
       toast.success('Nueva versión creada exitosamente con toda la estructura');
     },
@@ -623,6 +728,8 @@ export function useEnviarALicitacion() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       toast.success('Presupuesto enviado a licitación exitosamente');
     },
     onError: (error: any) => {
@@ -667,11 +774,11 @@ export function usePasarAContractual() {
       return response.pasarAContractual;
     },
     onSuccess: (data) => {
-      // Invalidar queries de ambas fases y aprobaciones
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'LICITACION'] });
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'CONTRACTUAL'] });
+      // Invalidar queries por proyecto y aprobaciones
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       queryClient.invalidateQueries({ queryKey: ['aprobaciones'] });
       toast.success('Solicitud de aprobación creada exitosamente');
     },
@@ -708,10 +815,10 @@ export function useCrearPresupuestoMetaDesdeContractual() {
       if (context?.cloningToastId) {
         dismissCloningToast(context.cloningToastId);
       }
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'CONTRACTUAL'] });
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'META'] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       toast.success('Presupuesto Meta creado exitosamente');
     },
     onError: (error: any, variables, context) => {
@@ -757,10 +864,11 @@ export function useEnviarVersionMetaAAprobacion() {
       return response.enviarVersionMetaAAprobacion;
     },
     onSuccess: (data) => {
-      // Invalidar queries de presupuestos META y aprobaciones
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'META'] });
+      // Invalidar queries por proyecto y aprobaciones
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       queryClient.invalidateQueries({ queryKey: ['aprobaciones'] });
       toast.success('Versión enviada a aprobación exitosamente');
     },
@@ -804,10 +912,11 @@ export function useEnviarVersionMetaAOficializacion() {
       return response.enviarVersionMetaAOficializacion;
     },
     onSuccess: (data) => {
-      // Invalidar queries de presupuestos META y aprobaciones
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'META'] });
+      // Invalidar queries por proyecto y aprobaciones
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       queryClient.invalidateQueries({ queryKey: ['aprobaciones'] });
       toast.success('Versión enviada a oficialización exitosamente');
     },
@@ -856,9 +965,12 @@ export function useUpdatePresupuesto() {
       );
       return response.updatePresupuesto;
     },
-    onSuccess: () => {
+    onSuccess: (presupuesto) => {
+      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', presupuesto.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
       queryClient.invalidateQueries({ queryKey: ['presupuesto'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       toast.success('Presupuesto actualizado exitosamente');
     },
     onError: (error: any) => {
@@ -881,8 +993,11 @@ export function useDeletePresupuesto() {
       );
       return response.deletePresupuesto;
     },
-    onSuccess: () => {
+    onSuccess: (presupuesto) => {
+      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', presupuesto.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       toast.success('Presupuesto eliminado exitosamente');
     },
     onError: (error: any) => {
@@ -915,6 +1030,8 @@ export function useEliminarGrupoPresupuestoCompleto() {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
         queryClient.invalidateQueries({ queryKey: ['proyectos'] });
+        // Invalidar la query de proyectos con presupuestos por fase
+        queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
         toast.success(result.message);
       } else {
         toast.error(result.message);
@@ -923,6 +1040,104 @@ export function useEliminarGrupoPresupuestoCompleto() {
     onError: (error: any) => {
       toast.error(error?.message || 'Error al eliminar el grupo de presupuesto');
     },
+  });
+}
+
+/**
+ * Hook para buscar presupuestos disponibles como plantillas (con paginación)
+ */
+export function useBuscarPresupuestosPlantillas(
+  searchTerm?: string,
+  filtroFase?: 'vigente' | 'todas' | 'META' | 'CONTRACTUAL' | 'LICITACION',
+  page: number = 1,
+  limit: number = 100
+) {
+  return useQuery<{
+    data: Presupuesto[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+    hasMore: boolean;
+  }>({
+    queryKey: ['presupuestos-plantillas', searchTerm, filtroFase, page, limit],
+    queryFn: async () => {
+      // Preparar filtros según la selección
+      let fases: ('BORRADOR' | 'LICITACION' | 'CONTRACTUAL' | 'META')[] | undefined;
+      let estados: ('borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'vigente')[] | undefined;
+      let incluirEstadosNull: boolean = false;
+
+      if (filtroFase === 'vigente') {
+        // Vigentes: solo fase META con estado vigente
+        fases = ['META'];
+        estados = ['vigente'];
+        incluirEstadosNull = false;
+      } else if (filtroFase === 'todas') {
+        // Incluir todas las fases con todos los estados
+        fases = ['META', 'CONTRACTUAL', 'LICITACION'];
+        estados = ['borrador', 'en_revision', 'aprobado', 'vigente'];
+        incluirEstadosNull = true;
+      } else if (filtroFase === 'META') {
+        // Fase META: incluir todos los estados
+        fases = ['META'];
+        estados = ['borrador', 'en_revision', 'aprobado', 'vigente'];
+        incluirEstadosNull = false;
+      } else if (filtroFase === 'CONTRACTUAL') {
+        // Fase CONTRACTUAL: estado null (no tienen estado asignado)
+        fases = ['CONTRACTUAL'];
+        estados = [];
+        incluirEstadosNull = true;
+      } else if (filtroFase === 'LICITACION') {
+        // Fase LICITACION: estado null (no tienen estado asignado)
+        fases = ['LICITACION'];
+        estados = [];
+        incluirEstadosNull = true;
+      } else {
+        // Sin filtro (todas las fases)
+        fases = ['META', 'CONTRACTUAL', 'LICITACION'];
+        estados = ['borrador', 'en_revision', 'aprobado', 'vigente'];
+        incluirEstadosNull = true;
+      }
+
+      // Preparar búsqueda
+      const search = searchTerm && searchTerm.trim()
+        ? { query: searchTerm.trim(), fields: ['nombre_presupuesto', 'id_presupuesto'] }
+        : undefined;
+
+      const response = await executeQuery<{
+        getPresupuestosPaginated: {
+          data: Presupuesto[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+          };
+        }
+      }>(
+        GET_PRESUPUESTOS_PAGINATED_QUERY,
+        {
+          fases,
+          estados: estados && estados.length > 0 ? estados : [],
+          incluirEstadosNull,
+          pagination: { page, limit },
+          search,
+        }
+      );
+
+      return {
+        data: response.getPresupuestosPaginated.data.map(normalizarPresupuesto),
+        pagination: response.getPresupuestosPaginated.pagination,
+        hasMore: response.getPresupuestosPaginated.pagination.hasNext,
+      };
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutos (más fresco para búsquedas)
   });
 }
 

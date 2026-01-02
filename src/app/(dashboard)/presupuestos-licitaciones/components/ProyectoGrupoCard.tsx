@@ -17,8 +17,13 @@ interface ProyectoGrupoCardProps {
 }
 
 export default function ProyectoGrupoCard({ proyecto, gruposPresupuestos }: ProyectoGrupoCardProps) {
+  // Para licitaciones: contar TODAS las versiones hijas (sin importar fase ni estado activo)
+  const versionesHijas = gruposPresupuestos.flatMap(grupo =>
+    grupo.versiones
+  );
+
   const totalPresupuestos = gruposPresupuestos.length;
-  const totalVersiones = gruposPresupuestos.reduce((acc, grupo) => acc + grupo.versiones.length, 0);
+  const totalVersiones = versionesHijas.length;
 
   // Generar un color único para cada proyecto basado en el id_proyecto
   const colorClasses = [

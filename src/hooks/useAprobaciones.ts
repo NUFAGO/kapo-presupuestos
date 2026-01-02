@@ -158,10 +158,10 @@ export function useAprobarPresupuesto() {
     onSuccess: (data) => {
       // Invalidar todas las queries relacionadas
       queryClient.invalidateQueries({ queryKey: ['aprobaciones'] });
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'LICITACION'] });
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'CONTRACTUAL'] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       toast.success('Presupuesto aprobado exitosamente');
     },
     onError: (error: any) => {
@@ -195,11 +195,10 @@ export function useRechazarPresupuesto() {
     onSuccess: (data) => {
       // Invalidar todas las queries relacionadas
       queryClient.invalidateQueries({ queryKey: ['aprobaciones'] });
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'LICITACION'] });
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'CONTRACTUAL'] });
-      queryClient.invalidateQueries({ queryKey: ['presupuestos', 'fase', 'META'] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', data.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
+      // Invalidar la query de proyectos con presupuestos por fase
+      queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
       toast.success('Presupuesto rechazado exitosamente');
     },
     onError: (error: any) => {

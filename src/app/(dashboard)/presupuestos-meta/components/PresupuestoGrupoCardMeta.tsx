@@ -225,6 +225,10 @@ export default function PresupuestoGrupoCardMeta({
                   {new Date(presupuestoPadre.fecha_creacion).toLocaleDateString('es-ES', {
                     month: 'short',
                     day: 'numeric',
+                    year: 'numeric',
+                  })} {new Date(presupuestoPadre.fecha_creacion).toLocaleTimeString('es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })}
                 </span>
               </div>
@@ -343,6 +347,8 @@ export default function PresupuestoGrupoCardMeta({
                           {new Date(version.fecha_creacion).toLocaleDateString('es-ES', {
                             month: 'short',
                             day: 'numeric',
+                            year: 'numeric',
+                          })} {new Date(version.fecha_creacion).toLocaleTimeString('es-ES', {
                             hour: '2-digit',
                             minute: '2-digit',
                           })}

@@ -18,6 +18,7 @@ export interface SelectProps {
   className?: string;
   disabled?: boolean;
   isLoading?: boolean;
+  renderOption?: (option: SelectOption, isSelected: boolean, onSelect: () => void) => React.ReactNode; // Renderizado personalizado de opciones
 }
 
 export function Select({
@@ -28,6 +29,7 @@ export function Select({
   className,
   disabled = false,
   isLoading = false,
+  renderOption,
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0, isDropup: false, bottom: undefined as number | undefined });
@@ -174,6 +176,10 @@ export function Select({
     ? `${baseClasses} ${otherInputClasses}`.trim()
     : baseClasses;
 
+  // Verificar si el className incluye text-center o text-right para no aplicar text-left
+  const hasTextAlign = className?.includes('text-center') || className?.includes('text-right');
+  const textAlignClass = hasTextAlign ? '' : 'text-left';
+
   const displayValue = selectedOption ? selectedOption.label : placeholder;
   const showPlaceholder = !selectedOption;
 
@@ -188,7 +194,8 @@ export function Select({
         disabled={disabled}
         className={cn(
           finalClasses,
-          'text-left cursor-pointer relative',
+          textAlignClass,
+          'cursor-pointer relative',
           disabled && 'opacity-50 cursor-not-allowed',
           isOpen && 'ring-2 ring-blue-500',
           showPlaceholder && 'text-[var(--text-secondary)]'
@@ -251,11 +258,23 @@ export function Select({
               // Invertir el array cuando es dropup para que el primer elemento aparezca al final
               (dropdownPosition.isDropup ? [...options].reverse() : options).map((option) => {
                 const isSelected = value === option.value;
+                const onSelect = () => handleSelectOption(option);
+                
+                // Si hay renderOption personalizado, usarlo
+                if (renderOption) {
+                  return (
+                    <div key={option.value}>
+                      {renderOption(option, isSelected, onSelect)}
+                    </div>
+                  );
+                }
+                
+                // Renderizado estándar
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => handleSelectOption(option)}
+                    onClick={onSelect}
                     className={cn(
                       'w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] transition-colors',
                       isSelected 
