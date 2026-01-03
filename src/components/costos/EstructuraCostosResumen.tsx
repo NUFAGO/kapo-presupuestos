@@ -275,26 +275,27 @@ export default function EstructuraCostosResumen({
       id_precio_recurso: r.id_precio_recurso ? r.id_precio_recurso : undefined,
     }));
 
-    // Primero calcular suma de HH de MO (para EQUIPO con %mo)
-    const sumaHH = calcularSumaParcialesManoObra(
+
+    return apuData.recursos.map((recurso: any) => {
+      const unidadMedidaLower = recurso.unidad_medida?.toLowerCase() || '';
+      
+      // Primero calcular suma de MO (dinámica para %mo)
+    const sumaMO = calcularSumaParcialesManoObra(
       recursosFormateados as any,
       rendimiento,
       jornada,
       preciosCompartidosMap
     );
 
-    return apuData.recursos.map((recurso: any) => {
-      const unidadMedidaLower = recurso.unidad_medida?.toLowerCase() || '';
-      
-      // Para recursos con unidad "%mo", el precio es dinámico (suma de parciales de recursos con "hh")
-      let precio: number;
-      if (unidadMedidaLower === '%mo') {
-        // El precio de %mo es la suma de parciales de recursos con "hh"
-        precio = Math.round(sumaHH * 100) / 100; // Redondear a 2 decimales
-      } else {
-        // Para otros recursos, usar lógica de prioridades estándar
-        precio = calcularPrecioRecurso(recurso, rendimiento, jornada);
-      }
+    // Para recursos con unidad "%mo", el precio es dinámico (suma de parciales de MO)
+    let precio: number;
+    if (unidadMedidaLower === '%mo') {
+      // El precio de %mo es la suma de parciales de recursos de MO
+      precio = Math.round(sumaMO * 100) / 100; // Redondear a 2 decimales
+    } else {
+      // Para otros recursos, usar lógica de prioridades estándar
+      precio = calcularPrecioRecurso(recurso, rendimiento, jornada);
+    }
 
       // Calcular parcial usando las mismas reglas que DetallePartidaPanel
       const parcial = calcularParcialRecurso(
@@ -305,7 +306,7 @@ export default function EstructuraCostosResumen({
         rendimiento,
         jornada,
         preciosCompartidosMap,
-        sumaHH
+        sumaMO
       );
 
       // Determinar si debe mostrar cuadrilla

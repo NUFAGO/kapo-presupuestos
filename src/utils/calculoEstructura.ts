@@ -104,24 +104,22 @@ function calcularPrecioRecurso(
 }
 
 /**
- * Calcula la suma de parciales de Mano de Obra (para EQUIPO con %mo)
- * Misma lógica que DetallePartidaPanel.calcularSumaParcialesManoObra
+ * Calcula la suma de parciales de Mano de Obra (para recursos con %mo)
+ * Suma todos los recursos de MANO_OBRA excepto los que tienen unidad %mo
+ * Reutiliza calcularParcialRecurso para evitar duplicación de lógica
  */
 export function calcularSumaParcialesManoObra(
   recursos: RecursoAPUCalculo[],
   rendimiento: number,
   jornada: number,
-  preciosCompartidosMap: Map<string, number>
+  preciosCompartidosMap: Map<string, number>,
+  mapaAPUs?: Map<string, APUCalculo>
 ): number {
   return recursos
-    .filter(r => r.unidad_medida?.toLowerCase() === 'hh')
+    .filter(r => r.tipo_recurso === 'MANO_OBRA' && r.unidad_medida?.toLowerCase() !== '%mo')
     .reduce((suma, r) => {
-      if (!rendimiento || rendimiento <= 0) return suma;
-      if (!jornada || jornada <= 0) return suma;
-
-      const precio = calcularPrecioRecurso(r, preciosCompartidosMap, rendimiento, jornada);
-      const cuadrilla = r.cuadrilla || 1;
-      const parcialMO = (1 / rendimiento) * jornada * cuadrilla * precio;
+      // Usar calcularParcialRecurso sin sumaManoObra (los MO individuales no la necesitan)
+      const parcialMO = calcularParcialRecurso(r, rendimiento, jornada, preciosCompartidosMap, undefined, mapaAPUs);
       return suma + parcialMO;
     }, 0);
 }
@@ -135,7 +133,7 @@ export function calcularParcialRecurso(
   rendimiento: number,
   jornada: number,
   preciosCompartidosMap: Map<string, number>,
-  sumaHHManoObra?: number,
+  sumaManoObra?: number,
   mapaAPUs?: Map<string, APUCalculo>
 ): number {
   // Si es una subpartida, calcular dinámicamente el precio_unitario_subpartida
@@ -168,10 +166,10 @@ export function calcularParcialRecurso(
   const unidadMedidaLower = recurso.unidad_medida?.toLowerCase() || '';
 
   // PRIMERO: Verificar unidades especiales (independientemente del tipo_recurso)
-  // Si tiene unidad "%mo", calcular basándose en la sumatoria de HH de recursos con unidad "hh"
+  // Si tiene unidad "%mo", calcular basándose en la sumatoria de MO * porcentaje
   if (unidadMedidaLower === '%mo') {
-    if (sumaHHManoObra === undefined) return 0;
-    return roundToTwo(sumaHHManoObra * (recurso.cantidad / 100));
+    if (sumaManoObra === undefined) return 0;
+    return roundToTwo(sumaManoObra * (recurso.cantidad / 100));
   }
 
   // Si tiene unidad "hh" (horas hombre), usar cálculo con cuadrilla
@@ -222,17 +220,18 @@ export function calcularCostoDirectoAPU(
   preciosCompartidosMap: Map<string, number>,
   mapaAPUs?: Map<string, APUCalculo>
 ): number {
-  // Primero calcular suma de HH de MO (para EQUIPO con %mo)
-  const sumaHH = calcularSumaParcialesManoObra(
+  // Primero calcular suma de MO (para recursos con %mo)
+  const sumaMO = calcularSumaParcialesManoObra(
     apu.recursos,
     apu.rendimiento,
     apu.jornada,
-    preciosCompartidosMap
+    preciosCompartidosMap,
+    mapaAPUs
   );
 
   // Calcular parcial de cada recurso (pasar mapaAPUs para calcular subpartidas recursivamente)
   const parciales = apu.recursos.map(r =>
-    calcularParcialRecurso(r, apu.rendimiento, apu.jornada, preciosCompartidosMap, sumaHH, mapaAPUs)
+    calcularParcialRecurso(r, apu.rendimiento, apu.jornada, preciosCompartidosMap, sumaMO, mapaAPUs)
   );
 
   // Sumar todos los parciales
