@@ -34,6 +34,8 @@ export {
   usePresupuesto,
   usePresupuestosPorFase,
   useBuscarPresupuestosPlantillas,
+  useEstructuraPresupuesto,
+  useEstructuraPresupuestoParaPlantilla,
   useCreateVersionDesdeVersion,
   usePasarAContractual,
   useCrearPresupuestoMetaDesdeContractual,

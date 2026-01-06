@@ -251,10 +251,10 @@ export default function ProyectoDetallePage({ params }: PageProps) {
                   nombre_presupuesto: data.nombre_presupuesto,
                   porcentaje_igv: data.porcentaje_igv || 18,
                   porcentaje_utilidad: data.porcentaje_utilidad || 0,
-                  // TODO: Implementar funcionalidad de plantilla
-                  // ...(usarPlantilla && plantillaSeleccionada && {
-                  //   id_presupuesto_plantilla: plantillaSeleccionada.id_presupuesto
-                  // })
+                  ...(data.id_presupuesto_plantilla && {
+                    id_presupuesto_plantilla: data.id_presupuesto_plantilla,
+                    mantenerAPUs: data.mantenerAPUs || false
+                  })
                 });
                 handleCloseModal();
               } catch (error) {

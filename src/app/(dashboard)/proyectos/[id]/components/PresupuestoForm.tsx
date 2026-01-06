@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/ui';
 import { Presupuesto, useBuscarPresupuestosPlantillas } from '@/hooks';
-import { Copy } from 'lucide-react';
+import { Copy, X } from 'lucide-react';
+import VistaEstructuraPlantilla from './VistaEstructuraPlantilla';
 
 interface PresupuestoFormProps {
   presupuesto?: Presupuesto;
@@ -63,6 +64,9 @@ export default function PresupuestoForm({
 
   // Estado local para búsqueda de plantillas
   const [busquedaPlantilla, setBusquedaPlantilla] = useState('');
+  
+  // Estado para mantener APUs y detalles de la plantilla
+  const [mantenerAPUs, setMantenerAPUs] = useState(true);
 
   // Memoizar parámetros de búsqueda para evitar queries innecesarias
   const searchParams = useMemo(() => ({
@@ -154,12 +158,24 @@ export default function PresupuestoForm({
 
     try {
       if (modoCrearPadre) {
-        // Modo crear padre: envía nombre, IGV y utilidad
+        // Validar: si el switch está activado, debe haber una plantilla seleccionada
+        if (usarPlantilla && !plantillaSeleccionada) {
+          // El botón ya está deshabilitado, pero por si acaso se intenta enviar de otra forma
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Modo crear padre: envía nombre, IGV, utilidad y parámetros de plantilla solo si el switch está activado Y hay plantilla seleccionada
         if (onSubmit) {
           await onSubmit({
             nombre_presupuesto: formData.nombre_presupuesto,
             porcentaje_igv: parseFloat(formData.porcentaje_igv) || 18,
             porcentaje_utilidad: parseFloat(formData.porcentaje_utilidad) || 0,
+            // Solo enviar parámetros de plantilla si el switch está activado Y hay plantilla seleccionada
+            ...(usarPlantilla && plantillaSeleccionada && {
+              id_presupuesto_plantilla: plantillaSeleccionada.id_presupuesto,
+              mantenerAPUs: mantenerAPUs
+            })
           });
         }
       } else {
@@ -251,167 +267,231 @@ export default function PresupuestoForm({
               </div>
             </div>
 
-            {/* Switch para usar plantilla - Solo en modo creación */}
+            {/* Checkbox para usar plantilla - Solo en modo creación */}
             {!editMode && setUsarPlantilla && (
-              <div className="mt-4 p-3 bg-[var(--background)]/30 rounded-lg border border-[var(--border-color)]/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Copy className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                      <label className="text-xs font-medium text-[var(--text-primary)]">
-                        Usar plantilla de presupuesto existente (opcional)
-                      </label>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer ml-4">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={usarPlantilla}
-                      onChange={(e) => {
-                        if (setUsarPlantilla) {
-                          setUsarPlantilla(e.target.checked);
-                          if (!e.target.checked && setPlantillaSeleccionada) {
-                            setPlantillaSeleccionada(null);
-                          }
-                          if (!e.target.checked && setBusquedaPlantilla) {
-                            setBusquedaPlantilla('');
-                          }
+              <div className="pt-4">
+                <label className="flex items-center gap-2 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={usarPlantilla}
+                    onChange={(e) => {
+                      if (setUsarPlantilla) {
+                        setUsarPlantilla(e.target.checked);
+                        if (!e.target.checked && setPlantillaSeleccionada) {
+                          setPlantillaSeleccionada(null);
+                          setMantenerAPUs(false);
                         }
-                      }}
-                      disabled={createPresupuestoPadrePending}
-                    />
-                    <div className="w-9 h-5 bg-[var(--background)] border border-[var(--border-color)] peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[var(--text-secondary)] after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500 peer-checked:border-blue-500 peer-checked:after:bg-white"></div>
-                  </label>
-                </div>
+                        if (!e.target.checked && setBusquedaPlantilla) {
+                          setBusquedaPlantilla('');
+                        }
+                      }
+                    }}
+                    disabled={createPresupuestoPadrePending}
+                    className="sr-only peer"
+                  />
+                  <div className="w-3.5 h-3.5 rounded border transition-all flex items-center justify-center peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/20 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed peer-checked:bg-blue-500 peer-checked:border-blue-500 border-[var(--border-color)] bg-[var(--background)]">
+                    {usarPlantilla && (
+                      <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-xs text-[var(--text-secondary)] peer-disabled:opacity-50">
+                    Usar plantilla de presupuesto existente
+                  </span>
+                </label>
 
                 {/* Sección de búsqueda de plantillas */}
                 {usarPlantilla && (
                   <div className="mt-2 space-y-3">
-                    {/* Filtro por fase */}
-                    <div>
-                      <div className="flex gap-4">
-                        {[
-                          { value: 'vigente', label: 'Vigentes (Meta)', color: 'text-blue-700 font-medium' },
-                          { value: 'todas', label: 'Todas las fases', color: 'text-gray-600' },
-                          { value: 'META', label: 'Meta', color: 'text-green-600' },
-                          { value: 'CONTRACTUAL', label: 'Contractual', color: 'text-blue-600' },
-                          { value: 'LICITACION', label: 'Licitación', color: 'text-orange-600' }
-                        ].map((option) => (
-                          <label key={option.value} className="flex items-center gap-1.5 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="fase-plantilla"
-                              value={option.value}
-                              checked={filtroFasePlantilla === option.value}
-                              onChange={(e) => setFiltroFasePlantilla && setFiltroFasePlantilla(e.target.value as 'vigente' | 'todas' | 'META' | 'CONTRACTUAL' | 'LICITACION')}
-                              disabled={createPresupuestoPadrePending}
-                              className={`w-3 h-3 border-[var(--border-color)] focus:ring-blue-500 ${option.color?.replace('text-', 'text-') || 'text-blue-600'}`}
-                            />
-                            <span className={`text-xs ${option.color || 'text-[var(--text-primary)]'}`}>{option.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
                     <div>
                       <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
                         Buscar plantilla
                       </label>
-                      <Input
-                        type="text"
-                        placeholder="Buscar por nombre o ID del presupuesto..."
-                        value={busquedaPlantilla}
-                        onChange={(e) => setBusquedaPlantilla && setBusquedaPlantilla(e.target.value)}
-                        disabled={createPresupuestoPadrePending}
-                      />
-                    </div>
-
-                    {/* Lista de resultados */}
-                    <div className="max-h-48 overflow-y-auto space-y-2">
-                      {isLoadingPlantillas ? (
-                        <div className="flex items-center justify-center py-6">
-                          <LoadingSpinner size={20} />
-                          <span className="ml-2 text-xs text-[var(--text-secondary)]">Buscando plantillas...</span>
-                        </div>
-                      ) : presupuestosPlantillas && presupuestosPlantillas.length > 0 ? (
-                        presupuestosPlantillas.map((plantilla: Presupuesto) => (
-                          <div
-                            key={plantilla.id_presupuesto}
-                            onClick={() => setPlantillaSeleccionada && setPlantillaSeleccionada(plantilla)}
-                            className={`p-2.5 rounded-lg border cursor-pointer transition-all text-xs ${
-                              plantillaSeleccionada?.id_presupuesto === plantilla.id_presupuesto
-                                ? 'border-blue-500 bg-blue-500/5'
-                                : 'border-[var(--border-color)] bg-[var(--background)]/50 hover:bg-[var(--background)]/70'
-                            }`}
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          placeholder="Buscar por nombre o ID del presupuesto..."
+                          value={plantillaSeleccionada ? plantillaSeleccionada.nombre_presupuesto : busquedaPlantilla}
+                          onChange={(e) => {
+                            if (!plantillaSeleccionada) {
+                              setBusquedaPlantilla && setBusquedaPlantilla(e.target.value);
+                            }
+                          }}
+                          disabled={createPresupuestoPadrePending || !!plantillaSeleccionada}
+                          className={plantillaSeleccionada ? 'bg-green-500/5 border-green-500/20 pr-8' : ''}
+                        />
+                        {plantillaSeleccionada && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPlantillaSeleccionada && setPlantillaSeleccionada(null);
+                              setBusquedaPlantilla && setBusquedaPlantilla('');
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
+                            disabled={createPresupuestoPadrePending}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-[var(--text-primary)] truncate text-xs">
-                                  {plantilla.nombre_presupuesto}
-                                </h4>
-                                <p className="text-[var(--text-secondary)] mt-0.5 text-xs">
-                                  ID: {plantilla.id_presupuesto}
-                                </p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <div className="flex items-center gap-1">
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                      plantilla.fase === 'META'
-                                        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                                        : plantilla.fase === 'CONTRACTUAL'
-                                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                                        : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
-                                    }`}>
-                                      V{plantilla.version} {plantilla.fase}
-                                    </span>
-                                    {filtroFasePlantilla === 'vigente' && plantilla.fase === 'META' && plantilla.estado === 'vigente' && (
-                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                                        VIGENTE
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[var(--text-secondary)] text-xs">
-                                    S/ {plantilla.total_presupuesto?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              </div>
-                              {plantillaSeleccionada?.id_presupuesto === plantilla.id_presupuesto && (
-                                <div className="text-blue-600 dark:text-blue-400 ml-2">
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {plantillaSeleccionada && (
+                      <div className="flex items-center gap-2 text-xs flex-wrap">
+                          <span className="text-[var(--text-secondary)]">
+                            ID: {plantillaSeleccionada.id_presupuesto}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            plantillaSeleccionada.fase === 'META'
+                              ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                              : plantillaSeleccionada.fase === 'CONTRACTUAL'
+                              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                              : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                          }`}>
+                            V{plantillaSeleccionada.version} {plantillaSeleccionada.fase}
+                          </span>
+                          <span className="text-[var(--text-secondary)]">
+                            S/ {plantillaSeleccionada.total_presupuesto?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <label className="flex items-center gap-1.5 cursor-pointer ml-auto">
+                            <input
+                              type="checkbox"
+                              checked={mantenerAPUs}
+                              onChange={(e) => setMantenerAPUs(e.target.checked)}
+                              disabled={createPresupuestoPadrePending}
+                              className="sr-only peer"
+                            />
+                            <div className="w-3.5 h-3.5 rounded border transition-all flex items-center justify-center peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/20 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed peer-checked:bg-blue-500 peer-checked:border-blue-500 border-[var(--border-color)] bg-[var(--background)]">
+                              {mantenerAPUs && (
+                                <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
                               )}
                             </div>
-                          </div>
-                        ))
-                      ) : busquedaPlantilla && busquedaPlantilla.trim() ? (
-                        <div className="text-center py-6">
-                          <p className="text-xs text-[var(--text-secondary)]">
-                            No se encontraron plantillas que coincidan con "{busquedaPlantilla}"
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="text-center py-6">
-                          <p className="text-xs text-[var(--text-secondary)]">
-                            Escribe para buscar plantillas disponibles
-                          </p>
+                            <span className="text-xs text-[var(--text-secondary)] peer-disabled:opacity-50">
+                              Conservar APUs y detalles
+                            </span>
+                          </label>
                         </div>
                       )}
-                    </div>
 
-                    {/* Plantilla seleccionada */}
-                    {plantillaSeleccionada && (
-                      <div className="p-2.5 bg-green-500/5 border border-green-500/20 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <svg className="w-3.5 h-3.5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                            Plantilla seleccionada: {plantillaSeleccionada.nombre_presupuesto}
-                          </span>
+                    {/* Solo mostrar filtros y lista si NO hay plantilla seleccionada */}
+                    {!plantillaSeleccionada && (
+                      <>
+                        {/* Filtro por fase */}
+                        <div>
+                          <div className="flex gap-4 flex-wrap">
+                            {[
+                              { value: 'vigente', label: 'Vigentes (Meta)' },
+                              { value: 'todas', label: 'Todas las fases' },
+                              { value: 'META', label: 'Meta' },
+                              { value: 'CONTRACTUAL', label: 'Contractual' },
+                              { value: 'LICITACION', label: 'Licitación' }
+                            ].map((option) => {
+                              const isChecked = filtroFasePlantilla === option.value;
+                              return (
+                                <label 
+                                  key={option.value} 
+                                  className={`flex items-center gap-1.5 cursor-pointer transition-opacity ${
+                                    createPresupuestoPadrePending ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="fase-plantilla"
+                                    value={option.value}
+                                    checked={isChecked}
+                                    onChange={(e) => setFiltroFasePlantilla && setFiltroFasePlantilla(e.target.value as 'vigente' | 'todas' | 'META' | 'CONTRACTUAL' | 'LICITACION')}
+                                    disabled={createPresupuestoPadrePending}
+                                    className="sr-only"
+                                  />
+                                  <div className={`w-3 h-3 rounded-full border transition-all flex items-center justify-center ${
+                                    isChecked
+                                      ? 'border-blue-500 bg-blue-500'
+                                      : 'border-[var(--border-color)] bg-[var(--background)]'
+                                  }`}>
+                                    {isChecked && (
+                                      <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+                                    )}
+                                  </div>
+                                  <span className={`text-xs transition-colors ${
+                                    isChecked
+                                      ? 'text-[var(--text-primary)]'
+                                      : 'text-[var(--text-secondary)]'
+                                  }`}>{option.label}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
+
+                        {/* Lista de resultados */}
+                        <div className="max-h-48 overflow-y-auto space-y-2">
+                          {isLoadingPlantillas ? (
+                            <div className="flex items-center justify-center py-6">
+                              <LoadingSpinner size={20} />
+                              <span className="ml-2 text-xs text-[var(--text-secondary)]">Buscando plantillas...</span>
+                            </div>
+                          ) : presupuestosPlantillas && presupuestosPlantillas.length > 0 ? (
+                            presupuestosPlantillas.map((plantilla: Presupuesto) => (
+                              <div
+                                key={plantilla.id_presupuesto}
+                                onClick={() => setPlantillaSeleccionada && setPlantillaSeleccionada(plantilla)}
+                                className="p-2.5 rounded-lg border cursor-pointer transition-all text-xs border-[var(--border-color)] bg-[var(--background)]/50 hover:bg-[var(--background)]/70"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-medium text-[var(--text-primary)] truncate text-xs">
+                                      {plantilla.nombre_presupuesto}
+                                    </h4>
+                                    <p className="text-[var(--text-secondary)] mt-0.5 text-xs">
+                                      ID: {plantilla.id_presupuesto}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <div className="flex items-center gap-1">
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                          plantilla.fase === 'META'
+                                            ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                                            : plantilla.fase === 'CONTRACTUAL'
+                                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                            : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                                        }`}>
+                                          V{plantilla.version} {plantilla.fase}
+                                        </span>
+                                        {filtroFasePlantilla === 'vigente' && plantilla.fase === 'META' && plantilla.estado === 'vigente' && (
+                                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                            VIGENTE
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[var(--text-secondary)] text-xs">
+                                        S/ {plantilla.total_presupuesto?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : busquedaPlantilla && busquedaPlantilla.trim() ? (
+                            <div className="text-center py-6">
+                              <p className="text-xs text-[var(--text-secondary)]">
+                                No se encontraron plantillas que coincidan con "{busquedaPlantilla}"
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="text-center py-6">
+                              <p className="text-xs text-[var(--text-secondary)]">
+                                Escribe para buscar plantillas disponibles
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Vista de estructura de la plantilla */}
+                    {plantillaSeleccionada && (
+                      <VistaEstructuraPlantilla id_presupuesto={plantillaSeleccionada.id_presupuesto} />
                     )}
                   </div>
                 )}

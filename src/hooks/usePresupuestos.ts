@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { executeQuery, executeMutation } from '@/services/graphql-client';
-import { GET_PRESUPUESTOS_BY_PROYECTO_QUERY, GET_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_QUERY, GET_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY, LIST_PRESUPUESTOS_QUERY, GET_PRESUPUESTOS_PAGINATED_QUERY } from '@/graphql/queries/presupuesto.queries';
+import { GET_PRESUPUESTOS_BY_PROYECTO_QUERY, GET_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY, GET_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY, LIST_PRESUPUESTOS_QUERY, GET_PRESUPUESTOS_PAGINATED_QUERY } from '@/graphql/queries/presupuesto.queries';
 import { ADD_PRESUPUESTO_MUTATION, UPDATE_PRESUPUESTO_MUTATION, DELETE_PRESUPUESTO_MUTATION, CREAR_PRESUPUESTO_PADRE_MUTATION, CREAR_VERSION_DESDE_PADRE_MUTATION, CREAR_VERSION_DESDE_VERSION_MUTATION, ENVIAR_A_LICITACION_MUTATION, PASAR_A_CONTRACTUAL_MUTATION, CREAR_PRESUPUESTO_META_DESDE_CONTRACTUAL_MUTATION, ACTUALIZAR_PRESUPUESTO_PADRE_MUTATION, ELIMINAR_GRUPO_PRESUPUESTO_COMPLETO_MUTATION, ENVIAR_VERSION_META_A_APROBACION_MUTATION, ENVIAR_VERSION_META_A_OFICIALIZACION_MUTATION } from '@/graphql/mutations/presupuesto.mutations';
 import { useAuth } from '@/context/auth-context';
 import toast from 'react-hot-toast';
@@ -319,6 +319,31 @@ export interface PrecioCompartidoEstructura {
   precio: number;
 }
 
+// Interfaz específica para creación de precios compartidos nuevos
+export interface PrecioCompartidoNuevo {
+  id_precio_recurso: string;
+  id_presupuesto: string;
+  recurso_id: string;
+  codigo_recurso?: string;
+  descripcion?: string;
+  unidad?: string;
+  tipo_recurso: 'MATERIAL' | 'MANO_OBRA' | 'EQUIPO' | 'SUBCONTRATO';
+  precio: number;
+  fecha_actualizacion: string;
+  usuario_actualizo: string;
+}
+
+// Interfaz para estructura de presupuesto con precios completos (para plantillas)
+export interface EstructuraPresupuestoParaPlantilla {
+  presupuesto: Presupuesto;
+  titulos: TituloEstructura[];
+  partidas: PartidaEstructura[];
+  apus?: APUEstructura[];
+  precios_compartidos?: PrecioCompartidoNuevo[]; // Precios con TODOS los campos
+  porcentaje_igv_padre?: number | null;
+  porcentaje_utilidad_padre?: number | null;
+}
+
 export interface EstructuraPresupuesto {
   presupuesto: Presupuesto;
   titulos: TituloEstructura[];
@@ -327,6 +352,27 @@ export interface EstructuraPresupuesto {
   precios_compartidos?: PrecioCompartidoEstructura[]; // NUEVO: Precios compartidos para cálculos en frontend
   porcentaje_igv_padre?: number | null; // Porcentajes del presupuesto padre para cálculos
   porcentaje_utilidad_padre?: number | null; // Porcentajes del presupuesto padre para cálculos
+}
+
+/**
+ * Hook para obtener la estructura completa del presupuesto PARA PLANTILLAS
+ * Incluye TODOS los campos de precios compartidos para integración
+ */
+export function useEstructuraPresupuestoParaPlantilla(id_presupuesto: string | null) {
+  return useQuery({
+    queryKey: ['estructura-presupuesto-plantilla', id_presupuesto],
+    queryFn: async () => {
+      if (!id_presupuesto) return null;
+
+      const response = await executeQuery<{ getEstructuraPresupuesto: EstructuraPresupuestoParaPlantilla | null }>(
+        GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY,
+        { id_presupuesto }
+      );
+
+      return response.getEstructuraPresupuesto;
+    },
+    enabled: !!id_presupuesto,
+  });
 }
 
 /**
@@ -572,10 +618,13 @@ export interface CrearPresupuestoPadreInput {
   porcentaje_igv?: number;
   porcentaje_utilidad?: number;
   fase?: 'BORRADOR' | 'LICITACION' | 'CONTRACTUAL' | 'META';
+  id_presupuesto_plantilla?: string;
+  mantenerAPUs?: boolean;
 }
 
 /**
  * Hook para crear un presupuesto padre (sin detalles)
+ * Muestra toast de clonación si se está clonando desde plantilla
  */
 export function useCreatePresupuestoPadre() {
   const queryClient = useQueryClient();
@@ -588,14 +637,38 @@ export function useCreatePresupuestoPadre() {
       );
       return response.crearPresupuestoPadre;
     },
-    onSuccess: (_, variables) => {
+    onMutate: async (variables) => {
+      // Mostrar toast de clonación solo si se está clonando desde plantilla
+      if (variables.id_presupuesto_plantilla) {
+        const toastId = showCloningToast();
+        // Pequeño delay para asegurar que el toast se renderice
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return { cloningToastId: toastId };
+      }
+      return { cloningToastId: null };
+    },
+    onSuccess: (data, variables, context) => {
+      // Cerrar toast de clonación si existe
+      if (context?.cloningToastId) {
+        dismissCloningToast(context.cloningToastId);
+      }
       queryClient.invalidateQueries({ queryKey: ['presupuestos', 'proyecto', variables.id_proyecto] });
       queryClient.invalidateQueries({ queryKey: ['presupuestos'] });
       // Invalidar la query de proyectos con presupuestos por fase
       queryClient.invalidateQueries({ queryKey: ['proyectos-con-presupuestos'] });
-      toast.success('Presupuesto creado exitosamente');
+      // Invalidar estructura si se clonó desde plantilla
+      if (variables.id_presupuesto_plantilla) {
+        queryClient.invalidateQueries({ queryKey: ['estructura', data.id_presupuesto] });
+      }
+      toast.success(variables.id_presupuesto_plantilla 
+        ? 'Presupuesto creado exitosamente con estructura clonada' 
+        : 'Presupuesto creado exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: any, variables, context) => {
+      // Cerrar toast de clonación si existe
+      if (context?.cloningToastId) {
+        dismissCloningToast(context.cloningToastId);
+      }
       toast.error(error?.message || 'Error al crear el presupuesto');
     },
   });
@@ -1050,7 +1123,8 @@ export function useBuscarPresupuestosPlantillas(
   searchTerm?: string,
   filtroFase?: 'vigente' | 'todas' | 'META' | 'CONTRACTUAL' | 'LICITACION',
   page: number = 1,
-  limit: number = 100
+  limit: number = 100,
+  enabled: boolean = true // Por defecto habilitado, puede deshabilitarse desde fuera
 ) {
   return useQuery<{
     data: Presupuesto[];
@@ -1065,6 +1139,7 @@ export function useBuscarPresupuestosPlantillas(
     hasMore: boolean;
   }>({
     queryKey: ['presupuestos-plantillas', searchTerm, filtroFase, page, limit],
+    enabled, // Permitir control externo de cuándo ejecutar la query
     queryFn: async () => {
       // Preparar filtros según la selección
       let fases: ('BORRADOR' | 'LICITACION' | 'CONTRACTUAL' | 'META')[] | undefined;

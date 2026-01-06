@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -116,9 +116,15 @@ export default function Modal({
           {(title || showCloseButton) && (
             <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)]">
               {title && (
-                <h3 className="text-sm font-bold text-[var(--text-secondary)]">
-                  {title}
-                </h3>
+                React.isValidElement(title) ? (
+                  <div className="flex-1">
+                    {title}
+                  </div>
+                ) : (
+                  <h3 className="text-sm font-bold text-[var(--text-secondary)]">
+                    {title}
+                  </h3>
+                )
               )}
               {showCloseButton && (
                 <button

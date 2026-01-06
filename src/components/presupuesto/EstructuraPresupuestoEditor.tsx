@@ -68,6 +68,7 @@ interface EstructuraPresupuestoEditorProps {
   nombre_presupuesto?: string;
   modo?: ModoEditor;
   rutaRetorno?: string; // Ruta a la que volver cuando se hace clic en el botón de volver
+  mantenerAPUs?: boolean; // Para integración de plantillas con APUs
 }
 
 
@@ -81,6 +82,7 @@ export default function EstructuraPresupuestoEditor({
   nombre_presupuesto = 'Presupuesto',
   modo = 'edicion',
   rutaRetorno,
+  mantenerAPUs = false,
 }: EstructuraPresupuestoEditorProps) {
   const router = useRouter();
   const [titulosColapsados, setTitulosColapsados] = useState<Set<string>>(new Set());
@@ -147,6 +149,15 @@ export default function EstructuraPresupuestoEditor({
   const [titulosEliminados, setTitulosEliminados] = useState<Set<string>>(new Set());
   const [partidasEliminadas, setPartidasEliminadas] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+
+  // Estados para elementos temporales (igual que títulos/partidas)
+  const [apusTemporales, setApusTemporales] = useState<any[]>([]);
+  const [preciosCompartidosTemporales, setPreciosCompartidosTemporales] = useState<any[]>([]);
+  const [apuPreciosMap, setApuPreciosMap] = useState<Map<string, string[]>>(new Map());
+
+  // Estado local para controlar "Mantener APUs y detalles" en el modal
+  const [modalMantenerAPUs, setModalMantenerAPUs] = useState(true);
+  const [integrandoPlantilla, setIntegrandoPlantilla] = useState(false);
   const [isSavingRecursos, setIsSavingRecursos] = useState(false);
 
   // Estado para subpartidas que necesitan creación de APU
@@ -160,6 +171,19 @@ export default function EstructuraPresupuestoEditor({
   
   // Ref para rastrear qué padres están siendo reordenados para evitar ejecuciones múltiples
   const padresReordenandoRef = useRef<Set<string | null>>(new Set());
+
+  // Estados combinados: existentes + temporales (igual que títulos/partidas)
+  const apusCombinados = useMemo(() => {
+    const existentes = estructuraData?.apus || [];
+    const temporales = apusTemporales || [];
+    return [...existentes, ...temporales];
+  }, [estructuraData?.apus, apusTemporales]);
+
+  const preciosCompartidosCombinados = useMemo(() => {
+    const existentes = estructuraData?.precios_compartidos || [];
+    const temporales = preciosCompartidosTemporales || [];
+    return [...existentes, ...temporales];
+  }, [estructuraData?.precios_compartidos, preciosCompartidosTemporales]);
 
   // Obtener id_proyecto de los datos del presupuesto
   const id_proyecto_real = estructuraData?.presupuesto?.id_proyecto || id_proyecto;
@@ -184,6 +208,7 @@ export default function EstructuraPresupuestoEditor({
   const [tituloEditando, setTituloEditando] = useState<Titulo | null>(null);
   const [partidaEditando, setPartidaEditando] = useState<Partida | null>(null);
   const [nombreItem, setNombreItem] = useState('');
+  const [usarPlantillaTituloModal, setUsarPlantillaTituloModal] = useState(false);
   
   // Estado para edición inline de metrado
   const [partidaEditandoMetrado, setPartidaEditandoMetrado] = useState<string | null>(null);
@@ -724,6 +749,15 @@ export default function EstructuraPresupuestoEditor({
     }
   }, [partidaSeleccionada]);
 
+  // Log de APU encontrado cuando cambia la selección de partida
+  useEffect(() => {
+    if (partidaSeleccionada) {
+      const apuEncontrado = apusCombinados.find(apu => apu.id_partida === partidaSeleccionada);
+      if (apuEncontrado) {
+      }
+    }
+  }, [partidaSeleccionada, apusCombinados, preciosCompartidosCombinados]);
+
   // Lógica de redimensionamiento del panel (optimizada con requestAnimationFrame)
   useEffect(() => {
     if (!isResizing) return;
@@ -1071,22 +1105,11 @@ export default function EstructuraPresupuestoEditor({
       }
     } else {
       // No hay item seleccionado: crear al final de los títulos raíz (sin padre)
-      // Obtener todos los items del mismo nivel (títulos raíz + partidas de títulos raíz)
-      const itemsMismoNivel: Array<{ orden: number }> = [];
-      
-      // Títulos raíz
+      // Para títulos raíz, solo considerar otros títulos raíz (no mezclar con partidas)
       const titulosRaiz = titulos.filter(t => t.id_titulo_padre === null);
-      titulosRaiz.forEach(t => itemsMismoNivel.push({ orden: t.orden }));
-      
-      // Partidas de títulos raíz (solo principales, sin id_partida_padre)
-      titulosRaiz.forEach(tituloRaiz => {
-        partidas
-          .filter(p => p.id_titulo === tituloRaiz.id_titulo && p.id_partida_padre === null)
-          .forEach(p => itemsMismoNivel.push({ orden: p.orden }));
-      });
-      
-      nuevoOrden = itemsMismoNivel.length > 0
-        ? Math.max(...itemsMismoNivel.map(item => item.orden)) + 1
+
+      nuevoOrden = titulosRaiz.length > 0
+        ? Math.max(...titulosRaiz.map(t => t.orden)) + 1
         : 1;
     }
 
@@ -1095,6 +1118,7 @@ export default function EstructuraPresupuestoEditor({
     setPartidaEditando(null);
     setNombreItem('');
     setTipoItemModal('TITULO');
+    setUsarPlantillaTituloModal(false); // Siempre abrir en "Nuevo título"
     setModalAbierto(true);
 
     // Guardar temporalmente los datos del nuevo título
@@ -1196,6 +1220,7 @@ export default function EstructuraPresupuestoEditor({
     setTituloEditando(null);
     setNombreItem('');
     setTipoItemModal('PARTIDA');
+    setUsarPlantillaTituloModal(false); // Siempre abrir en "Nueva partida"
     setModalAbierto(true);
 
     // Guardar temporalmente los datos de la nueva partida en el estado
@@ -1366,7 +1391,720 @@ export default function EstructuraPresupuestoEditor({
     setTituloEditando(null);
     setPartidaEditando(null);
     setNombreItem('');
+    setUsarPlantillaTituloModal(false); // Resetear estado de plantilla al guardar
+    setModalMantenerAPUs(true); // Resetear checkbox de mantener APUs
   }, [tituloEditando, partidaEditando, tipoItemModal, id_presupuesto, id_proyecto_real, calcularNivelDinamico, titulos, generarIdTemporal]);
+
+  /**
+   * Integra una estructura completa de plantilla (título + descendientes) de forma limpia
+   * sin mantener referencias a IDs originales de la plantilla
+   */
+  const handleIntegrarEstructura = useCallback(async (idTituloRaiz: string, estructuraPlantilla: { titulos: any[], partidas: any[], apus?: any[], precios_compartidos?: any[] }, mantenerAPUs: boolean = false, preciosCompartidosProyecto?: any[]) => {
+    // Evitar ejecuciones duplicadas
+    if (integrandoPlantilla) {
+      return;
+    }
+
+    setIntegrandoPlantilla(true);
+    // 1. Filtrar la estructura para obtener solo el título raíz y sus descendientes
+    const tituloRaiz = estructuraPlantilla.titulos.find(t => t.id_titulo === idTituloRaiz);
+    if (!tituloRaiz) return;
+
+    // Obtener todos los títulos descendientes
+    const obtenerDescendientes = (idPadre: string): any[] => {
+      const hijos = estructuraPlantilla.titulos.filter(t => t.id_titulo_padre === idPadre);
+      let todos = [...hijos];
+      hijos.forEach(hijo => {
+        todos = todos.concat(obtenerDescendientes(hijo.id_titulo));
+      });
+      return todos;
+    };
+
+    const titulosDescendientes = obtenerDescendientes(idTituloRaiz);
+    const todosLosTitulos = [tituloRaiz, ...titulosDescendientes];
+
+    // Obtener precios del proyecto actual para verificaciones
+    const preciosProyectoActual = preciosCompartidosProyecto || [];
+
+    // 2. Filtrar APUs y precios compartidos SOLO si mantenerAPUs está activado
+    let apusRelevantes: any[] = [];
+    let preciosRelevantes: any[] = [];
+    let mapaPreciosExistentes = new Map<string, string>(); // id_precio_plantilla -> id_precio_proyecto
+
+    let integrationSuccess = false;
+    try {
+      if (mantenerAPUs) {
+        console.log('🔧 MODO "Mantener APUs y detalles" ACTIVADO');
+      } else {
+      }
+
+
+    // 3. Crear mapas de IDs temporales
+    const mapaIdsTitulos = new Map<string, string>();
+    todosLosTitulos.forEach(titulo => {
+      mapaIdsTitulos.set(titulo.id_titulo, generarIdTemporal());
+    });
+
+    // Obtener todas las partidas relacionadas con los títulos
+    const partidasRelacionadas = estructuraPlantilla.partidas.filter(partida =>
+      todosLosTitulos.some(titulo => titulo.id_titulo === partida.id_titulo)
+    );
+
+    const mapaIdsPartidas = new Map<string, string>();
+    partidasRelacionadas.forEach(partida => {
+      mapaIdsPartidas.set(partida.id_partida, generarIdTemporal());
+    });
+
+    // Filtrar APUs que corresponden SOLO a las partidas que se van a copiar
+    if (mantenerAPUs) {
+      // 2.2 Obtener IDs de TODAS las partidas relacionadas (incluyendo subpartidas)
+      const idsPartidasNuevas = new Set<string>();
+      partidasRelacionadas.forEach(partida => idsPartidasNuevas.add(partida.id_partida));
+
+      // 2.3 Filtrar APUs que corresponden SOLO a las partidas que se van a copiar
+      const todosLosAPUsPlantilla = (estructuraPlantilla.apus || []);
+      apusRelevantes = todosLosAPUsPlantilla.filter(apu =>
+        idsPartidasNuevas.has(apu.id_partida)
+      );
+
+      // Calcular APUs excluidos para el resumen
+      const apusExcluidos = todosLosAPUsPlantilla.filter(apu =>
+        !idsPartidasNuevas.has(apu.id_partida)
+      );
+
+      console.log('🔧 Filtrado de APUs:');
+      console.log(`  └─ Plantilla: ${todosLosAPUsPlantilla.length} | Copiadas: ${idsPartidasNuevas.size} | Relevantes: ${apusRelevantes.length} | Excluidas: ${apusExcluidos.length}`);
+
+      // 2.4 Extraer IDs únicos de precios compartidos usados por estos APUs
+      const idsPreciosNecesarios = new Set<string>();
+      apusRelevantes.forEach((apu: any) => {
+        apu.recursos.forEach((recurso: any) => {
+          if (recurso.id_precio_recurso) {
+            idsPreciosNecesarios.add(recurso.id_precio_recurso);
+          }
+        });
+      });
+
+      // 2.5 Filtrar precios compartidos relevantes
+      preciosRelevantes = (estructuraPlantilla.precios_compartidos || []).filter((precio: any) =>
+        idsPreciosNecesarios.has(precio.id_precio_recurso)
+      );
+
+    }
+
+    // Crear mapas para APUs y precios si mantenerAPUs está activado
+    const mapaIdsAPUs = new Map<string, string>();
+    const mapaIdsPrecios = new Map<string, string>();
+
+    if (mantenerAPUs) {
+      apusRelevantes.forEach(apu => {
+        mapaIdsAPUs.set(apu.id_apu, generarIdTemporal());
+      });
+
+      // Solo crear temp IDs para precios que NO existen en el proyecto
+      preciosRelevantes.forEach(precio => {
+        const precioExistente = preciosProyectoActual.find(pc =>
+          pc.recurso_id === precio.recurso_id
+        );
+
+        if (!precioExistente) {
+          // Solo crear temp ID si NO existe precio para este recurso
+          mapaIdsPrecios.set(precio.id_precio_recurso, generarIdTemporal());
+        }
+        // Si existe, simplemente no lo incluimos (no se crea temp ID)
+      });
+    }
+
+    // 4. Preparar datos temporales para la integración
+    const tempData = (window as any).__nuevoTituloTemp;
+    if (!tempData || !id_proyecto_real) return;
+
+    // Calcular el nivel correcto basándose en el padre
+    const nivelCalculado = tempData.id_padre
+      ? calcularNivelDinamico(tempData.id_padre) + 1
+      : 1;
+
+    // 5. Crear los nuevos títulos con IDs únicos y órdenes jerárquicos correctos
+    const nuevosTitulos: Titulo[] = [];
+
+
+    // Función para calcular el orden correcto para un título basado en su padre
+    const calcularOrdenParaTitulo = (idPadre: string | null, indexEnGrupo: number): number => {
+      if (idPadre === null) {
+        // Para títulos raíz: orden máximo actual + index + 1
+        const titulosRaiz = titulos.filter(t => t.id_titulo_padre === null);
+        const ordenMaximoRaiz = titulosRaiz.length > 0 ? Math.max(...titulosRaiz.map(t => t.orden)) : 0;
+        return ordenMaximoRaiz + indexEnGrupo + 1;
+      } else {
+        // Para títulos con padre: obtener todos los hermanos (títulos + partidas) y calcular orden
+        const titulosHermano = titulos.filter(t => t.id_titulo_padre === idPadre);
+        const partidasHermano = partidas.filter(p => p.id_titulo === idPadre && p.id_partida_padre === null);
+        const ordenesHermano = [...titulosHermano.map(t => t.orden), ...partidasHermano.map(p => p.orden)];
+        const ordenMaximoHermano = ordenesHermano.length > 0 ? Math.max(...ordenesHermano) : 0;
+        return ordenMaximoHermano + indexEnGrupo + 1;
+      }
+    };
+
+    // Agrupar títulos por padre para calcular órdenes correctamente
+    const titulosPorPadre = new Map<string | null, any[]>();
+    todosLosTitulos.forEach(titulo => {
+      const idPadreNuevo = titulo.id_titulo_padre
+        ? mapaIdsTitulos.get(titulo.id_titulo_padre) || null
+        : (tempData.id_padre || null);
+
+      if (!titulosPorPadre.has(idPadreNuevo)) {
+        titulosPorPadre.set(idPadreNuevo, []);
+      }
+      titulosPorPadre.get(idPadreNuevo)!.push(titulo);
+    });
+
+    // Crear títulos con órdenes correctos por grupo de padre
+    titulosPorPadre.forEach((titulosDelPadre, idPadre) => {
+      titulosDelPadre.forEach((tituloPlantilla, index) => {
+        const nuevoId = mapaIdsTitulos.get(tituloPlantilla.id_titulo)!;
+        const ordenFinal = calcularOrdenParaTitulo(idPadre, index);
+
+        const nuevoTitulo: Titulo = {
+          id_titulo: nuevoId,
+          id_presupuesto: id_presupuesto!,
+          id_titulo_padre: idPadre,
+          nivel: tituloPlantilla.id_titulo_padre ? calcularNivelDinamico(idPadre!) + 1 : nivelCalculado,
+          numero_item: '', // Se calculará dinámicamente al guardar
+          descripcion: tituloPlantilla.descripcion,
+          tipo: tituloPlantilla.tipo,
+          orden: ordenFinal,
+          total_parcial: tituloPlantilla.total_parcial,
+          id_especialidad: tituloPlantilla.id_especialidad
+        };
+
+        nuevosTitulos.push(nuevoTitulo);
+      });
+    });
+
+    // 6. Crear las nuevas partidas con IDs únicos y órdenes jerárquicos correctos
+    const nuevasPartidas: Partida[] = [];
+
+    // Función para calcular el orden correcto para una partida dentro de su título padre
+    const calcularOrdenParaPartida = (idTitulo: string, indexEnGrupo: number): number => {
+      // Obtener todas las partidas principales del título (sin id_partida_padre)
+      const partidasMismoTitulo = partidas.filter(p => p.id_titulo === idTitulo && p.id_partida_padre === null);
+      const ordenMaximoPartidas = partidasMismoTitulo.length > 0 ? Math.max(...partidasMismoTitulo.map(p => p.orden)) : 0;
+      return ordenMaximoPartidas + indexEnGrupo + 1;
+    };
+
+    // Agrupar partidas por título padre para calcular órdenes correctamente
+    const partidasPorTitulo = new Map<string, any[]>();
+    partidasRelacionadas.forEach(partida => {
+      // Solo procesar partidas principales (sin padre), las subpartidas se manejan recursivamente
+      if (partida.id_partida_padre === null) {
+        const nuevoIdTitulo = mapaIdsTitulos.get(partida.id_titulo)!;
+        if (!partidasPorTitulo.has(nuevoIdTitulo)) {
+          partidasPorTitulo.set(nuevoIdTitulo, []);
+        }
+        partidasPorTitulo.get(nuevoIdTitulo)!.push(partida);
+      }
+    });
+
+    // Crear partidas principales con órdenes correctos
+    partidasPorTitulo.forEach((partidasDelTitulo, nuevoIdTitulo) => {
+      partidasDelTitulo.forEach((partidaPlantilla, index) => {
+        const nuevoIdPartida = mapaIdsPartidas.get(partidaPlantilla.id_partida)!;
+        const ordenFinal = calcularOrdenParaPartida(nuevoIdTitulo, index);
+
+        const nuevaPartida: Partida = {
+          id_partida: nuevoIdPartida,
+          id_presupuesto: id_presupuesto!,
+          id_proyecto: id_proyecto_real,
+          id_titulo: nuevoIdTitulo,
+          id_partida_padre: null, // Es partida principal
+          nivel_partida: 1, // Partidas principales siempre nivel 1
+          numero_item: '', // Se calculará dinámicamente al guardar
+          descripcion: partidaPlantilla.descripcion,
+          unidad_medida: partidaPlantilla.unidad_medida,
+          metrado: partidaPlantilla.metrado,
+          precio_unitario: mantenerAPUs && partidaPlantilla.precio_unitario ? partidaPlantilla.precio_unitario : 0,
+          parcial_partida: mantenerAPUs && partidaPlantilla.parcial_partida ? partidaPlantilla.parcial_partida : 0,
+          orden: ordenFinal,
+          estado: partidaPlantilla.estado
+        };
+
+        nuevasPartidas.push(nuevaPartida);
+
+        // Procesar subpartidas recursivamente
+        const procesarSubpartidas = (idPartidaPadre: string, idNuevoPartidaPadre: string, nivel: number) => {
+          const subpartidas = partidasRelacionadas.filter(p => p.id_partida_padre === idPartidaPadre);
+          subpartidas.forEach((subpartida, subIndex) => {
+            const nuevoIdSubpartida = mapaIdsPartidas.get(subpartida.id_partida)!;
+
+            // Para subpartidas, el orden es relativo dentro de su padre
+            const ordenSubpartida = subIndex + 1;
+
+            const nuevaSubpartida: Partida = {
+              id_partida: nuevoIdSubpartida,
+              id_presupuesto: id_presupuesto!,
+              id_proyecto: id_proyecto_real,
+              id_titulo: nuevoIdTitulo,
+              id_partida_padre: idNuevoPartidaPadre,
+              nivel_partida: nivel,
+              numero_item: '', // Se calculará dinámicamente al guardar
+              descripcion: subpartida.descripcion,
+              unidad_medida: subpartida.unidad_medida,
+              metrado: subpartida.metrado,
+              precio_unitario: mantenerAPUs && subpartida.precio_unitario ? subpartida.precio_unitario : 0,
+              parcial_partida: mantenerAPUs && subpartida.parcial_partida ? subpartida.parcial_partida : 0,
+              orden: ordenSubpartida,
+              estado: subpartida.estado
+            };
+
+            nuevasPartidas.push(nuevaSubpartida);
+
+            // Procesar subpartidas recursivamente
+            procesarSubpartidas(subpartida.id_partida, nuevoIdSubpartida, nivel + 1);
+          });
+        };
+
+        procesarSubpartidas(partidaPlantilla.id_partida, nuevoIdPartida, 2);
+      });
+    });
+
+
+    // 7. Crear APUs y precios compartidos nuevos si mantenerAPUs está activado
+    const nuevosAPUsParaEstado: any[] = [];
+    const nuevosPreciosParaEstado: import('@/hooks/usePresupuestos').PrecioCompartidoNuevo[] = [];
+
+    if (mantenerAPUs) {
+      // Crear APUs - mapear IDs de partida a los nuevos IDs temporales asignados
+      apusRelevantes.forEach(apu => {
+        const nuevoIdAPU = mapaIdsAPUs.get(apu.id_apu)!;
+        const idPartidaOriginal = mapaIdsPartidas.get(apu.id_partida) || apu.id_partida;
+
+        // Actualizar referencias de recursos a precios
+        const recursosActualizados = apu.recursos.map((recurso: any, index: number) => {
+          // Generar ID único para el recurso (requerido por MongoDB)
+          const idRecursoApu = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${index}`;
+
+          // Mapear campos según RecursoApuInput (con id_recurso_apu requerido, precio -> precio_usuario)
+          let recursoMapeado: any = {
+            id_recurso_apu: idRecursoApu, // ← Campo requerido agregado
+            recurso_id: recurso.recurso_id,
+            id_partida_subpartida: recurso.id_partida_subpartida,
+            codigo_recurso: recurso.codigo_recurso,
+            descripcion: recurso.descripcion,
+            unidad_medida: recurso.unidad_medida,
+            tipo_recurso: recurso.tipo_recurso,
+            tipo_recurso_codigo: recurso.tipo_recurso_codigo, // ← Agregado
+            precio_usuario: recurso.precio, // Cambiar 'precio' a 'precio_usuario'
+            precio_unitario_subpartida: recurso.precio_unitario_subpartida,
+            tiene_precio_override: recurso.tiene_precio_override,
+            precio_override: recurso.precio_override,
+            cuadrilla: recurso.cuadrilla,
+            cantidad: recurso.cantidad,
+            desperdicio_porcentaje: recurso.desperdicio_porcentaje,
+            cantidad_con_desperdicio: recurso.cantidad_con_desperdicio,
+            parcial: recurso.parcial,
+            orden: recurso.orden
+          };
+
+          // Solo agregar id_precio_recurso si existe y está disponible
+          if (recurso.id_precio_recurso) {
+            const precioExistente = preciosProyectoActual.find(pc =>
+              pc.recurso_id === recurso.recurso_id
+            );
+
+            if (precioExistente) {
+              // Usar el precio existente del proyecto
+              recursoMapeado.id_precio_recurso = precioExistente.id_precio_recurso;
+            } else {
+              // Usar el temp ID del precio nuevo
+              const tempIdPrecio = mapaIdsPrecios.get(recurso.id_precio_recurso);
+              recursoMapeado.id_precio_recurso = tempIdPrecio || null;
+            }
+          }
+
+          return recursoMapeado;
+        });
+
+        // Mapear el ID de partida al nuevo ID temporal asignado a la partida
+        const nuevoIdPartidaMapeado = mapaIdsPartidas.get(apu.id_partida) || apu.id_partida;
+
+        nuevosAPUsParaEstado.push({
+          id_apu: nuevoIdAPU,
+          id_partida: nuevoIdPartidaMapeado, // Usar el nuevo ID temporal asignado a la partida
+          rendimiento: apu.rendimiento,
+          jornada: apu.jornada,
+          recursos: recursosActualizados
+        });
+      });
+
+      console.log(`🔗 APUs asignadas a IDs temporales: ${nuevosAPUsParaEstado.length}`);
+
+      // Crear precios compartidos nuevos (solo los que no existen)
+      preciosRelevantes.forEach(precio => {
+        if (mapaIdsPrecios.has(precio.id_precio_recurso)) {
+          const nuevoIdPrecio = mapaIdsPrecios.get(precio.id_precio_recurso)!;
+          nuevosPreciosParaEstado.push({
+            id_precio_recurso: nuevoIdPrecio,
+            id_presupuesto: id_presupuesto, // Requerido para creación
+            recurso_id: precio.recurso_id,
+            codigo_recurso: precio.codigo_recurso, // Ya disponible en la plantilla
+            descripcion: precio.descripcion, // Ya disponible en la plantilla
+            unidad: precio.unidad, // Ya disponible en la plantilla
+            tipo_recurso: precio.tipo_recurso, // Ya disponible en la plantilla
+            precio: precio.precio,
+            fecha_actualizacion: new Date().toISOString(), // Timestamp actual
+            usuario_actualizo: 'PLANTILLA' // Identificador de origen
+          });
+        }
+      });
+    }
+
+    // 8. Agregar todo a la estructura local
+    setTitulos(prev => {
+      // Insertar los nuevos títulos manteniendo el orden
+      const titulosOrdenados = [...prev, ...nuevosTitulos].sort((a, b) => a.orden - b.orden);
+      return titulosOrdenados;
+    });
+
+    setPartidas(prev => {
+      // Insertar las nuevas partidas manteniendo el orden
+      const partidasOrdenadas = [...prev, ...nuevasPartidas].sort((a, b) => a.orden - b.orden);
+      return partidasOrdenadas;
+    });
+
+    // 9. Agregar elementos temporales a estados combinados (igual que títulos/partidas)
+    if (mantenerAPUs) {
+      // Agregar elementos temporales a estados combinados (se mostrarán inmediatamente)
+
+      const nuevosApus = [...apusTemporales, ...nuevosAPUsParaEstado];
+      const nuevosPrecios = [...preciosCompartidosTemporales, ...nuevosPreciosParaEstado];
+
+      setApusTemporales(nuevosApus);
+      setPreciosCompartidosTemporales(nuevosPrecios);
+
+
+
+      // Marcar como exitoso y cerrar modal
+      integrationSuccess = true;
+      setModalAbierto(false);
+      setIntegrandoPlantilla(false);
+      return;
+    }
+
+
+    // 8. Normalizar los órdenes después de la inserción
+    setTimeout(() => {
+      // Normalizar el padre donde se insertaron los títulos
+      const padresAfectados = new Set<string | null>();
+      nuevosTitulos.forEach(titulo => {
+        padresAfectados.add(titulo.id_titulo_padre);
+      });
+
+      // Normalizar cada padre afectado
+      padresAfectados.forEach(padre => {
+        reordenarItemsPadre(padre);
+      });
+
+      // Si se agregaron títulos raíz, normalizar también
+      if (padresAfectados.has(null)) {
+        reordenarItemsPadre(null);
+      }
+    }, 0);
+
+        // 9. Cerrar modal y limpiar estado
+      integrationSuccess = true;
+      setModalAbierto(false);
+      setTituloEditando(null);
+      setPartidaEditando(null);
+      setNombreItem('');
+      setIntegrandoPlantilla(false);
+    } finally {
+      // Asegurar que siempre se cierre el modal y se resete el estado, incluso si hay errores
+      if (!integrationSuccess) {
+        setModalAbierto(false);
+        setIntegrandoPlantilla(false);
+      }
+    }
+  }, [generarIdTemporal, calcularNivelDinamico, id_presupuesto, id_proyecto_real, setTitulos, setPartidas, setModalAbierto, setTituloEditando, setPartidaEditando, setNombreItem, integrandoPlantilla, setIntegrandoPlantilla]);
+
+  /**
+   * Integra múltiples partidas seleccionadas de plantilla con sus APUs correspondientes
+   * Usa el mismo sistema unificado que handleIntegrarEstructura
+   */
+  const handleIntegrarPartidasSeleccionadas = useCallback(async (
+    idsPartidasSeleccionadas: string[],
+    estructuraPlantilla: { titulos: any[], partidas: any[], apus?: any[], precios_compartidos?: any[] },
+    mantenerAPUs: boolean = false,
+    preciosCompartidosProyecto?: any[]
+  ) => {
+    // Evitar ejecuciones duplicadas
+    if (integrandoPlantilla) {
+      return;
+    }
+
+    setIntegrandoPlantilla(true);
+    let integrationSuccess = false;
+
+    try {
+      console.log('🔄 Iniciando integración de múltiples partidas seleccionadas:', idsPartidasSeleccionadas);
+
+      // 1. Filtrar SOLO las partidas seleccionadas
+      const partidasSeleccionadas = estructuraPlantilla.partidas.filter(p =>
+        idsPartidasSeleccionadas.includes(p.id_partida)
+      );
+
+      if (partidasSeleccionadas.length === 0) {
+        console.log('❌ No se encontraron partidas seleccionadas');
+        return;
+      }
+
+      // Obtener precios del proyecto actual para verificaciones
+      const preciosProyectoActual = preciosCompartidosProyecto || [];
+
+      // 2. Filtrar APUs y precios compartidos SOLO si mantenerAPUs está activado
+      let apusRelevantes: any[] = [];
+      let preciosRelevantes: any[] = [];
+      let mapaPreciosExistentes = new Map<string, string>();
+
+      if (mantenerAPUs) {
+        console.log('🔧 MODO "Mantener APUs y detalles" ACTIVADO para múltiples partidas');
+
+        // 2.1 Filtrar APUs que corresponden SOLO a las partidas seleccionadas
+        const todosLosAPUsPlantilla = (estructuraPlantilla.apus || []);
+        apusRelevantes = todosLosAPUsPlantilla.filter(apu =>
+          idsPartidasSeleccionadas.includes(apu.id_partida)
+        );
+
+        console.log('🔧 Filtrado de APUs para partidas seleccionadas:');
+        console.log(`  └─ Plantilla: ${todosLosAPUsPlantilla.length} | Partidas seleccionadas: ${idsPartidasSeleccionadas.length} | APUs relevantes: ${apusRelevantes.length}`);
+
+        // 2.2 Extraer IDs únicos de precios compartidos usados por estos APUs
+        const idsPreciosNecesarios = new Set<string>();
+        apusRelevantes.forEach((apu: any) => {
+          apu.recursos.forEach((recurso: any) => {
+            if (recurso.id_precio_recurso) {
+              idsPreciosNecesarios.add(recurso.id_precio_recurso);
+            }
+          });
+        });
+
+        // 2.3 Filtrar precios compartidos relevantes
+        preciosRelevantes = (estructuraPlantilla.precios_compartidos || []).filter((precio: any) =>
+          idsPreciosNecesarios.has(precio.id_precio_recurso)
+        );
+      }
+
+      // 3. Preparar temp data para múltiples partidas (usa el mismo sistema)
+      const tempData = (window as any).__nuevaPartidaTemp;
+      if (!tempData || !id_proyecto_real) return;
+
+      // 4. Crear mapas de IDs temporales
+      const mapaIdsPartidas = new Map<string, string>();
+      partidasSeleccionadas.forEach(partida => {
+        mapaIdsPartidas.set(partida.id_partida, generarIdTemporal());
+      });
+
+      // Crear mapas para APUs y precios si mantenerAPUs está activado
+      const mapaIdsAPUs = new Map<string, string>();
+      const mapaIdsPrecios = new Map<string, string>();
+
+      if (mantenerAPUs) {
+        apusRelevantes.forEach(apu => {
+          mapaIdsAPUs.set(apu.id_apu, generarIdTemporal());
+        });
+
+        // Solo crear temp IDs para precios que NO existen en el proyecto
+        preciosRelevantes.forEach(precio => {
+          const precioExistente = preciosProyectoActual.find(pc =>
+            pc.recurso_id === precio.recurso_id
+          );
+
+          if (!precioExistente) {
+            // Solo crear temp ID si NO existe precio para este recurso
+            mapaIdsPrecios.set(precio.id_precio_recurso, generarIdTemporal());
+          }
+          // Si existe, simplemente no lo incluimos (no se crea temp ID)
+        });
+      }
+
+      // 5. Crear las nuevas partidas con ordenamiento CONSECUTIVO
+      const nuevasPartidas: Partida[] = [];
+
+      // Calcular orden base para las nuevas partidas consecutivas
+      const ordenBase = tempData.id_titulo
+        ? (() => {
+            // Si hay un título específico, calcular orden después de las partidas existentes
+            const partidasMismoTitulo = partidas.filter(p => p.id_titulo === tempData.id_titulo && p.id_partida_padre === null);
+            const ordenMaximo = partidasMismoTitulo.length > 0 ? Math.max(...partidasMismoTitulo.map(p => p.orden)) : 0;
+            return ordenMaximo;
+          })()
+        : (() => {
+            // Para raíz, calcular el orden máximo global
+            const todasLasPartidas = partidas.filter(p => p.id_partida_padre === null);
+            const ordenMaximo = todasLasPartidas.length > 0 ? Math.max(...todasLasPartidas.map(p => p.orden)) : 0;
+            return ordenMaximo;
+          })();
+
+      // Crear partidas con ordenamiento consecutivo
+      partidasSeleccionadas.forEach((partidaPlantilla, index) => {
+        const nuevoIdPartida = mapaIdsPartidas.get(partidaPlantilla.id_partida)!;
+        const ordenConsecutivo = ordenBase + index + 1;
+
+        const nuevaPartida: Partida = {
+          id_partida: nuevoIdPartida,
+          id_presupuesto: id_presupuesto!,
+          id_proyecto: id_proyecto_real,
+          id_titulo: tempData.id_titulo || null,
+          id_partida_padre: null, // Partidas principales
+          nivel_partida: 1,
+          numero_item: '', // Se calculará dinámicamente al guardar
+          descripcion: partidaPlantilla.descripcion,
+          unidad_medida: partidaPlantilla.unidad_medida,
+          metrado: partidaPlantilla.metrado,
+          precio_unitario: mantenerAPUs && partidaPlantilla.precio_unitario ? partidaPlantilla.precio_unitario : 0,
+          parcial_partida: mantenerAPUs && partidaPlantilla.parcial_partida ? partidaPlantilla.parcial_partida : 0,
+          orden: ordenConsecutivo,
+          estado: partidaPlantilla.estado
+        };
+
+        nuevasPartidas.push(nuevaPartida);
+      });
+
+      // 6. Crear APUs y precios compartidos nuevos si mantenerAPUs está activado
+      const nuevosAPUsParaEstado: any[] = [];
+      const nuevosPreciosParaEstado: import('@/hooks/usePresupuestos').PrecioCompartidoNuevo[] = [];
+
+      if (mantenerAPUs) {
+        // Crear APUs - mapear IDs de partida a los nuevos IDs temporales asignados
+        apusRelevantes.forEach(apu => {
+          const nuevoIdAPU = mapaIdsAPUs.get(apu.id_apu)!;
+          const idPartidaOriginal = mapaIdsPartidas.get(apu.id_partida) || apu.id_partida;
+
+          const nuevoAPU = {
+            id_apu: nuevoIdAPU,
+            id_partida: idPartidaOriginal,
+            descripcion: apu.descripcion,
+            rendimiento: apu.rendimiento,
+            jornada: apu.jornada,
+            recursos: apu.recursos.map((recurso: any, index: number) => {
+              const idRecursoApu = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${index}`;
+
+              // Mapear campos según RecursoApuInput
+              let recursoMapeado: any = {
+                id_recurso_apu: idRecursoApu,
+                recurso_id: recurso.recurso_id,
+                id_partida_subpartida: recurso.id_partida_subpartida,
+                codigo_recurso: recurso.codigo_recurso,
+                descripcion: recurso.descripcion,
+                unidad_medida: recurso.unidad_medida,
+                tipo_recurso: recurso.tipo_recurso,
+                tipo_recurso_codigo: recurso.tipo_recurso_codigo,
+                precio_usuario: recurso.precio,
+                precio_unitario_subpartida: recurso.precio_unitario_subpartida,
+                tiene_precio_override: recurso.tiene_precio_override,
+                precio_override: recurso.precio_override,
+                cuadrilla: recurso.cuadrilla,
+                cantidad: recurso.cantidad,
+                rendimiento: recurso.rendimiento,
+                desperdicio_porcentaje: recurso.desperdicio_porcentaje,
+                cantidad_con_desperdicio: recurso.cantidad_con_desperdicio,
+                parcial: recurso.parcial,
+                precio_total: recurso.precio_total,
+                orden: recurso.orden,
+                observaciones: recurso.observaciones,
+                // Solo agregar id_precio_recurso si existe y está disponible
+                id_precio_recurso: (() => {
+                  if (recurso.id_precio_recurso) {
+                    const precioExistente = preciosProyectoActual.find(pc =>
+                      pc.recurso_id === recurso.recurso_id
+                    );
+
+                    if (precioExistente) {
+                      // Usar el precio existente del proyecto
+                      return precioExistente.id_precio_recurso;
+                    } else {
+                      // Usar el temp ID del precio nuevo
+                      const tempIdPrecio = mapaIdsPrecios.get(recurso.id_precio_recurso);
+                      return tempIdPrecio || null;
+                    }
+                  }
+                  return null;
+                })()
+              };
+
+              return recursoMapeado;
+            })
+          };
+
+          nuevosAPUsParaEstado.push(nuevoAPU);
+        });
+
+        // Crear precios compartidos nuevos
+        preciosRelevantes.forEach(precio => {
+          const nuevoIdPrecio = mapaIdsPrecios.get(precio.id_precio_recurso);
+          if (nuevoIdPrecio) { // Solo si se creó un temp ID (precio no existe)
+            const nuevoPrecio: import('@/hooks/usePresupuestos').PrecioCompartidoNuevo = {
+              id_precio_recurso: nuevoIdPrecio,
+              id_presupuesto: id_presupuesto!,
+              recurso_id: precio.recurso_id,
+              codigo_recurso: precio.codigo_recurso,
+              descripcion: precio.descripcion,
+              unidad: precio.unidad,
+              tipo_recurso: precio.tipo_recurso,
+              precio: precio.precio,
+              fecha_actualizacion: new Date().toISOString(),
+              usuario_actualizo: 'PLANTILLA'
+            };
+
+            nuevosPreciosParaEstado.push(nuevoPrecio);
+          }
+        });
+      }
+
+      // 7. Agregar todo al estado unificado (igual que títulos)
+      setPartidas(prev => {
+        const partidasOrdenadas = [...prev, ...nuevasPartidas].sort((a, b) => a.orden - b.orden);
+        return partidasOrdenadas;
+      });
+
+      if (mantenerAPUs) {
+        const nuevosApus = [...apusTemporales, ...nuevosAPUsParaEstado];
+        const nuevosPrecios = [...preciosCompartidosTemporales, ...nuevosPreciosParaEstado];
+
+        setApusTemporales(nuevosApus);
+        setPreciosCompartidosTemporales(nuevosPrecios);
+      }
+
+      // 8. Normalizar órdenes después de la inserción
+      setTimeout(() => {
+        if (tempData.id_titulo) {
+          reordenarItemsPadre(tempData.id_titulo);
+        } else {
+          reordenarItemsPadre(null);
+        }
+      }, 0);
+
+      // 9. Cerrar modal y limpiar estado
+      integrationSuccess = true;
+      setModalAbierto(false);
+      setTituloEditando(null);
+      setPartidaEditando(null);
+      setNombreItem('');
+      setIntegrandoPlantilla(false);
+
+      console.log('✅ Integración de múltiples partidas completada:', {
+        partidasIntegradas: nuevasPartidas.length,
+        apusIntegrados: nuevosAPUsParaEstado.length,
+        preciosIntegrados: nuevosPreciosParaEstado.length
+      });
+
+    } finally {
+      // Asegurar que siempre se cierre el modal y se resete el estado, incluso si hay errores
+      if (!integrationSuccess) {
+        setModalAbierto(false);
+        setIntegrandoPlantilla(false);
+      }
+    }
+  }, [generarIdTemporal, id_presupuesto, id_proyecto_real, setPartidas, setApusTemporales, setPreciosCompartidosTemporales, setModalAbierto, setPartidaEditando, setNombreItem, integrandoPlantilla, setIntegrandoPlantilla, apusTemporales, preciosCompartidosTemporales, partidas]);
 
   /**
    * Cierra el modal
@@ -1376,6 +2114,7 @@ export default function EstructuraPresupuestoEditor({
     setTituloEditando(null);
     setPartidaEditando(null);
     setNombreItem('');
+    setUsarPlantillaTituloModal(false); // Resetear estado de plantilla al cerrar
     delete (window as any).__nuevoTituloTemp;
     delete (window as any).__nuevaPartidaTemp;
   }, []);
@@ -2743,7 +3482,6 @@ export default function EstructuraPresupuestoEditor({
     }
 
     const tiempoInicio = performance.now();
-    console.log('[FRONTEND] 🚀 Iniciando guardado de cambios...');
 
     try {
       setIsSaving(true);
@@ -2922,8 +3660,6 @@ export default function EstructuraPresupuestoEditor({
       const partidasEliminar = Array.from(partidasEliminadas);
 
       const tiempoPreparacionTotal = performance.now() - tiempoPreparacion;
-      console.log(`[FRONTEND] ⏱️ Preparación de datos: ${tiempoPreparacionTotal.toFixed(2)}ms`);
-      console.log(`[FRONTEND] 📊 Resumen: ${titulosCrear.length} títulos crear, ${partidasCrear.length} partidas crear, ${titulosActualizar.length} títulos actualizar, ${partidasActualizar.length} partidas actualizar, ${titulosEliminar.length} títulos eliminar, ${partidasEliminar.length} partidas eliminar`);
 
       // Ejecutar mutación batch con transacción
       const tiempoBatchInicio = performance.now();
@@ -2937,6 +3673,8 @@ export default function EstructuraPresupuestoEditor({
           partidasActualizadas: Array<{ id_partida: string }>;
           titulosEliminados: string[];
           partidasEliminadas: string[];
+          apusCreados: any[];
+          preciosCreados: any[];
         };
       }>(BATCH_ESTRUCTURA_PRESUPUESTO_MUTATION, {
         input: {
@@ -2946,90 +3684,48 @@ export default function EstructuraPresupuestoEditor({
           partidasActualizar,
           titulosEliminar,
           partidasEliminar,
+          apusCrear: apusTemporales.length > 0 ? apusTemporales.map(apu => ({
+            id_apu: apu.id_apu,
+            id_partida: apu.id_partida, // Aún temporal, se resolverá en backend
+            rendimiento: apu.rendimiento,
+            jornada: apu.jornada,
+            recursos: apu.recursos
+          })) : undefined,
+          preciosCrear: preciosCompartidosTemporales.length > 0 ? preciosCompartidosTemporales.map(precio => ({
+            ...precio,
+            id_presupuesto: id_presupuesto // Forzar el presupuesto actual
+          })) : undefined,
         },
       });
 
       const tiempoBatchTotal = performance.now() - tiempoBatchInicio;
-      console.log(`[FRONTEND] ⏱️ Mutación batch completada: ${tiempoBatchTotal.toFixed(2)}ms`);
 
       if (!response.batchEstructuraPresupuesto.success) {
         throw new Error(response.batchEstructuraPresupuesto.message || 'Error al guardar los cambios');
       }
 
-      // Crear APUs para subpartidas nuevas que fueron creadas
-      if (subpartidasParaCrearApu.size > 0) {
-        const tiempoApuInicio = performance.now();
-        console.log(`[FRONTEND] 🔧 Creando ${subpartidasParaCrearApu.size} APUs para subpartidas...`);
-        // Importar las funciones necesarias para crear APUs
-        const { useCreateApu } = await import('@/hooks/useAPU');
-        const createApu = useCreateApu();
+      // Los APUs y precios ya se crearon en la mutación batch
 
-        // Crear un mapa de temp_id -> real_id para las subpartidas
-        const tempIdToRealId = new Map<string, string>();
-        response.batchEstructuraPresupuesto.partidasCreadas.forEach(p => {
-          if (p.temp_id && p.temp_id.startsWith('temp_')) {
-            tempIdToRealId.set(p.temp_id, p.id_partida);
-          }
-        });
-
-        for (const [tempId, subpartida] of subpartidasParaCrearApu) {
-          const realId = tempIdToRealId.get(tempId);
-          if (!realId || !subpartida.recursos || subpartida.recursos.length === 0) continue;
-
-          const recursosInput: any[] = subpartida.recursos.map((r, index) => ({
-            recurso_id: r.recurso_id,
-            codigo_recurso: r.codigo_recurso,
-            descripcion: r.descripcion,
-            unidad_medida: r.unidad_medida,
-            tipo_recurso: r.tipo_recurso,
-            tipo_recurso_codigo: r.tipo_recurso,
-            id_precio_recurso: r.id_precio_recurso,
-            precio_usuario: r.precio,
-            cuadrilla: r.cuadrilla,
-            cantidad: r.cantidad,
-            desperdicio_porcentaje: r.desperdicio_porcentaje || 0,
-            cantidad_con_desperdicio: r.cantidad * (1 + (r.desperdicio_porcentaje || 0) / 100),
-            parcial: r.parcial,
-            orden: index,
-          }));
-
-          try {
-            await createApu.mutateAsync({
-              id_partida: realId,
-              id_presupuesto: id_proyecto_real!,
-              id_proyecto: id_proyecto_real!,
-              rendimiento: subpartida.rendimiento || 1.0,
-              jornada: subpartida.jornada || 8,
-              recursos: recursosInput,
-            });
-          } catch (error) {
-            console.error(`Error creando APU para subpartida ${realId}:`, error);
-            // No fallar toda la operación por un error en APU
-          }
-        }
-
-        // Limpiar el estado de subpartidas para crear APU
-        setSubpartidasParaCrearApu(new Map());
-        const tiempoApuTotal = performance.now() - tiempoApuInicio;
-        console.log(`[FRONTEND] ⏱️ Creación de APUs completada: ${tiempoApuTotal.toFixed(2)}ms`);
-      }
+      // Subpartidas y sus APUs ya se manejan en la mutación batch
 
       // Invalidar queries para recargar datos
       const tiempoInvalidacionInicio = performance.now();
       queryClient.invalidateQueries({ queryKey: ['estructura-presupuesto', id_presupuesto] });
       const tiempoInvalidacionTotal = performance.now() - tiempoInvalidacionInicio;
-      console.log(`[FRONTEND] ⏱️ Invalidación de queries: ${tiempoInvalidacionTotal.toFixed(2)}ms`);
       
       // NO esperar - React Query maneja el refetch automáticamente
       
       // Refetch usando fetchQuery que respeta el hook y sus cálculos
       const tiempoRefetchInicio = performance.now();
-      console.log('[FRONTEND] 🔄 Refetch de estructura con cálculos...');
+
+      // Forzar refetch invalidando primero
+      await queryClient.invalidateQueries({ queryKey: ['estructura-presupuesto', id_presupuesto] });
+      await queryClient.refetchQueries({ queryKey: ['estructura-presupuesto', id_presupuesto] });
+
       const estructuraCalculada = await queryClient.fetchQuery<import('@/hooks/usePresupuestos').EstructuraPresupuesto | null>({
         queryKey: ['estructura-presupuesto', id_presupuesto],
       });
       const tiempoRefetchTotal = performance.now() - tiempoRefetchInicio;
-      console.log(`[FRONTEND] ⏱️ Refetch y cálculos completados: ${tiempoRefetchTotal.toFixed(2)}ms`);
       
       // El hook ya calculó parcial_presupuesto, monto_igv, monto_utilidad y total_presupuesto
       // Solo tomamos esos valores que ya están calculados y los guardamos en backend
@@ -3053,7 +3749,6 @@ export default function EstructuraPresupuestoEditor({
             }
           );
           const tiempoGuardarTotalesTotal = performance.now() - tiempoGuardarTotalesInicio;
-          console.log(`[FRONTEND] ⏱️ Guardado de totales: ${tiempoGuardarTotalesTotal.toFixed(2)}ms`);
         } catch (error) {
           console.error('[FRONTEND] ❌ Error al guardar totales del presupuesto:', error);
           // No mostrar error al usuario, es una operación secundaria
@@ -3063,16 +3758,24 @@ export default function EstructuraPresupuestoEditor({
       const tiempoTotal = performance.now() - tiempoInicio;
       console.log(`[FRONTEND] ✅ Guardado completo: ${tiempoTotal.toFixed(2)}ms`);
 
-      // Limpiar estados de eliminados
+      // Limpiar estados de eliminados y elementos nuevos ya guardados
       setTitulosEliminados(new Set());
       setPartidasEliminadas(new Set());
+      setApusTemporales([]);
+      setPreciosCompartidosTemporales([]);
 
-      // Limpiar estados de selección múltiple
+      // APUs y precios ya se guardaron en la mutación batch
+
+      // Limpiar estados después del guardado exitoso
       setModoSeleccionMultiple(false);
       setItemsSeleccionadosMultiple(new Set());
       setItemSeleccionado(null);
       setItemCortado(null);
       setItemsCortadosMultiple(new Set());
+
+      // Limpiar elementos nuevos de integración de plantilla
+      setApusTemporales([]);
+      setPreciosCompartidosTemporales([]);
 
       toast.success(response.batchEstructuraPresupuesto.message || 'Cambios guardados exitosamente');
     } catch (error: any) {
@@ -3219,7 +3922,7 @@ export default function EstructuraPresupuestoEditor({
               size="sm"
               variant={hayCambiosPendientes ? "default" : "outline"}
               onClick={handleGuardarCambios}
-              disabled={(!hayCambiosPendientes && !isSaving && !isSavingRecursos) || isSaving || isSavingRecursos || createTitulo.isPending || updateTitulo.isPending || createPartida.isPending || updatePartida.isPending || deleteTitulo.isPending || deletePartida.isPending}
+              disabled={(!hayCambiosPendientes && !isSaving && !isSavingRecursos) || isSaving || isSavingRecursos || integrandoPlantilla || createTitulo.isPending || updateTitulo.isPending || createPartida.isPending || updatePartida.isPending || deleteTitulo.isPending || deletePartida.isPending}
               className={`flex items-center gap-1.5 h-6 px-2 text-xs ${hayCambiosPendientes ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''
                 }`}
               title={hayCambiosPendientes ? 'Guardar cambios pendientes' : 'No hay cambios para guardar'}
@@ -3229,7 +3932,7 @@ export default function EstructuraPresupuestoEditor({
               ) : (
                 <Save className="h-3 w-3" />
               )}
-              {(isSaving || isSavingRecursos) ? 'Guardando...' : (hayCambiosPendientes ? 'Guardar cambios' : 'Sin cambios')}
+              {(isSaving || isSavingRecursos) ? 'Guardando...' : integrandoPlantilla ? 'Integrando...' : (hayCambiosPendientes ? 'Guardar cambios' : 'Sin cambios')}
               {hayCambiosPendientes && !isSaving && !isSavingRecursos && (
                 <span className="ml-1 w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
               )}
@@ -3529,7 +4232,6 @@ export default function EstructuraPresupuestoEditor({
                                 style={{ paddingLeft: `${(calcularNivelDinamico(titulo.id_titulo) - 1) * 12}px` }}
                               >
                                 {titulo.descripcion}
-                                {/* Comentado temporalmente - puede ser útil para debugging en el futuro */}
                                 {/* <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
                                   [{titulo.orden}]
                                 </span> */}
@@ -3606,7 +4308,6 @@ export default function EstructuraPresupuestoEditor({
                               }}
                             >
                               {partida.descripcion}
-                              {/* Comentado temporalmente - puede ser útil para debugging en el futuro */}
                               {/* <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
                                 [{partida.orden}]
                               </span> */}
@@ -3657,12 +4358,12 @@ export default function EstructuraPresupuestoEditor({
 
                         {/* Precio */}
                         <td className="px-2 py-1 text-center border-r border-[var(--border-color)] whitespace-nowrap">
-                          <span className="text-xs text-[var(--text-secondary)]">S/ {partida.precio_unitario.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-xs text-[var(--text-secondary)]">S/ {(partida.precio_unitario || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
                         </td>
 
                         {/* Parcial */}
                         <td className="px-2 py-1 text-right whitespace-nowrap">
-                          <span className="text-xs text-[var(--text-primary)]">S/ {partida.parcial_partida.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+                          <span className="text-xs text-[var(--text-primary)]">S/ {(partida.parcial_partida || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
                         </td>
                       </tr>
                     );
@@ -3704,8 +4405,8 @@ export default function EstructuraPresupuestoEditor({
             id_presupuesto={id_presupuesto}
             id_proyecto={id_proyecto_real}
             partida={partidaSeleccionada ? partidas.find(p => p.id_partida === partidaSeleccionada) || null : null}
-            apuCalculado={partidaSeleccionada && estructuraData?.apus ? estructuraData.apus.find(apu => apu.id_partida === partidaSeleccionada) || null : null}
-            apusCalculados={estructuraData?.apus || null}
+            apuCalculado={partidaSeleccionada ? apusCombinados.find(apu => apu.id_partida === partidaSeleccionada) || null : null}
+            apusCalculados={apusCombinados}
             onCerrarPanel={() => {
               setPanelInferiorHeight(0);
               if (modoSeleccionMultiple) {
@@ -3762,11 +4463,40 @@ export default function EstructuraPresupuestoEditor({
         isOpen={modalAbierto}
         onClose={handleCerrarModal}
         title={
-          tipoItemModal === 'TITULO'
-            ? (tituloEditando ? 'Editar Título' : 'Crear Título')
-            : (partidaEditando ? 'Editar Partida' : 'Crear Partida')
+          (tipoItemModal === 'TITULO' || tipoItemModal === 'PARTIDA') && !tituloEditando && !partidaEditando ? (
+            <div className="flex justify-center items-center w-full h-full">
+              <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setUsarPlantillaTituloModal(false)}
+                  className={`px-4 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
+                    !usarPlantillaTituloModal
+                      ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background)]/40'
+                  }`}
+                >
+                  {tipoItemModal === 'TITULO' ? 'Nuevo título' : 'Nueva partida'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUsarPlantillaTituloModal(true)}
+                  className={`px-4 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
+                    usarPlantillaTituloModal
+                      ? 'bg-green-500/10 text-green-600 dark:text-green-400 shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background)]/40'
+                  }`}
+                >
+                  {tipoItemModal === 'TITULO' ? 'Título existente' : 'Partidas existente'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            tipoItemModal === 'TITULO'
+              ? 'Editar Título'
+              : (partidaEditando ? 'Editar Partida' : 'Crear Partida')
+          )
         }
-        size="sm"
+        size={(tipoItemModal === 'TITULO' || tipoItemModal === 'PARTIDA') && !tituloEditando && !partidaEditando && usarPlantillaTituloModal ? 'lg' : 'sm'}
       >
         <CrearPartidasTitulosForm
           nombre={nombreItem}
@@ -3782,6 +4512,27 @@ export default function EstructuraPresupuestoEditor({
             parcial_partida: partidaEditando.parcial_partida,
           } : undefined}
           id_especialidad={tituloEditando?.id_especialidad}
+          id_proyecto={id_proyecto}
+          onUsarPlantillaChange={setUsarPlantillaTituloModal}
+          mantenerAPUs={modalMantenerAPUs}
+          onMantenerAPUsChange={setModalMantenerAPUs}
+          onIntegrarEstructura={(idTituloRaiz, estructuraPlantilla, mantenerAPUsParam) =>
+            handleIntegrarEstructura(
+              idTituloRaiz,
+              estructuraPlantilla,
+              mantenerAPUsParam ?? modalMantenerAPUs,
+              estructuraData?.precios_compartidos
+            )
+          }
+          onIntegrarPartidasSeleccionadas={(idsPartidas, estructuraPlantilla, mantenerAPUsParam) =>
+            handleIntegrarPartidasSeleccionadas(
+              idsPartidas,
+              estructuraPlantilla,
+              mantenerAPUsParam ?? modalMantenerAPUs,
+              estructuraData?.precios_compartidos
+            )
+          }
+          usarPlantillaModal={usarPlantillaTituloModal}
         />
       </Modal>
 
@@ -3796,7 +4547,7 @@ export default function EstructuraPresupuestoEditor({
         id_presupuesto={id_presupuesto}
         id_proyecto={id_proyecto_real}
         id_partida_padre={itemSeleccionado}
-        apusCalculados={estructuraData?.apus || null}
+        apusCalculados={apusCombinados}
         onAgregarSubPartida={(subPartida) => {
           // Agregar la subpartida como una nueva partida al estado
           setPartidas(prev => {

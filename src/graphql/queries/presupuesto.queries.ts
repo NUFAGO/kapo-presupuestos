@@ -314,8 +314,8 @@ export const GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY = `
 
 // La jerarquía se construye en el frontend usando id_titulo_padre e id_partida_padre
 // AHORA INCLUYE APUs completos para calcular precio_unitario y parcial_partida en frontend
-export const GET_ESTRUCTURA_PRESUPUESTO_QUERY = `
-  query GetEstructuraPresupuesto($id_presupuesto: String!) {
+export const GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY = `
+  query GetEstructuraPresupuestoParaPlantilla($id_presupuesto: String!) {
     getEstructuraPresupuesto(id_presupuesto: $id_presupuesto) {
       presupuesto {
         _id
@@ -386,6 +386,124 @@ export const GET_ESTRUCTURA_PRESUPUESTO_QUERY = `
         id_proyecto
         rendimiento
         jornada
+        recursos {
+          id_recurso_apu
+          recurso_id
+          id_partida_subpartida
+          codigo_recurso
+          descripcion
+          unidad_medida
+          tipo_recurso
+          id_precio_recurso
+          precio
+          precio_override
+          tiene_precio_override
+          cantidad
+          cuadrilla
+          desperdicio_porcentaje
+          cantidad_con_desperdicio
+          parcial
+          precio_unitario_subpartida
+          orden
+        }
+      }
+      precios_compartidos {
+        id_precio_recurso
+        id_presupuesto
+        recurso_id
+        codigo_recurso
+        descripcion
+        unidad
+        tipo_recurso
+        precio
+        fecha_actualizacion
+        usuario_actualizo
+      }
+      porcentaje_igv_padre
+      porcentaje_utilidad_padre
+    }
+  }
+`;
+
+export const GET_ESTRUCTURA_PRESUPUESTO_QUERY = `
+  query GetEstructuraPresupuesto($id_presupuesto: String!) {
+    getEstructuraPresupuesto(id_presupuesto: $id_presupuesto) {
+      presupuesto {
+        _id
+        id_presupuesto
+        id_proyecto
+        nombre_presupuesto
+        costo_directo
+        monto_igv
+        monto_utilidad
+        parcial_presupuesto
+        total_presupuesto
+        porcentaje_igv
+        porcentaje_utilidad
+        plazo
+        ppto_base
+        ppto_oferta
+        fecha_creacion
+        observaciones
+        numeracion_presupuesto
+        fase
+        version
+        descripcion_version
+        es_padre
+        id_grupo_version
+        estado
+        estado_aprobacion {
+          tipo
+          estado
+          id_aprobacion
+        }
+        es_inmutable
+        es_activo
+      }
+      titulos {
+        _id
+        id_titulo
+        id_presupuesto
+        id_proyecto
+        id_titulo_padre
+        nivel
+        numero_item
+        descripcion
+        tipo
+        orden
+        total_parcial
+        id_especialidad
+      }
+      partidas {
+        _id
+        id_partida
+        id_titulo
+        id_presupuesto
+        id_proyecto
+        id_partida_padre
+        nivel_partida
+        numero_item
+        descripcion
+        unidad_medida
+        metrado
+        precio_unitario
+        parcial_partida
+        orden
+        estado
+      }
+      apus {
+        _id
+        id_apu
+        id_partida
+        id_presupuesto
+        id_proyecto
+        rendimiento
+        jornada
+        costo_materiales
+        costo_mano_obra
+        costo_equipos
+        costo_subcontratos
+        costo_directo
         recursos {
           id_recurso_apu
           recurso_id

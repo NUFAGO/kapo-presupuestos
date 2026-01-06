@@ -127,6 +127,8 @@ export const CREAR_PRESUPUESTO_PADRE_MUTATION = `
     $porcentaje_igv: Float
     $porcentaje_utilidad: Float
     $fase: FasePresupuesto
+    $id_presupuesto_plantilla: String
+    $mantenerAPUs: Boolean
   ) {
     crearPresupuestoPadre(
       id_proyecto: $id_proyecto
@@ -134,6 +136,8 @@ export const CREAR_PRESUPUESTO_PADRE_MUTATION = `
       porcentaje_igv: $porcentaje_igv
       porcentaje_utilidad: $porcentaje_utilidad
       fase: $fase
+      id_presupuesto_plantilla: $id_presupuesto_plantilla
+      mantenerAPUs: $mantenerAPUs
     ) {
       _id
       id_presupuesto
