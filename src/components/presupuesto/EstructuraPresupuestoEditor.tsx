@@ -3687,6 +3687,8 @@ export default function EstructuraPresupuestoEditor({
           apusCrear: apusTemporales.length > 0 ? apusTemporales.map(apu => ({
             id_apu: apu.id_apu,
             id_partida: apu.id_partida, // Aún temporal, se resolverá en backend
+            id_proyecto: id_proyecto_real!, // Agregar id_proyecto requerido
+            id_presupuesto: id_presupuesto, // Agregar id_presupuesto requerido
             rendimiento: apu.rendimiento,
             jornada: apu.jornada,
             recursos: apu.recursos
@@ -4351,7 +4353,7 @@ export default function EstructuraPresupuestoEditor({
                               className={`text-xs ${modo === 'edicion' ? 'text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}
                               title={modo === 'edicion' ? 'Clic para editar' : ''}
                             >
-                              {partida.metrado.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                              {partida.metrado.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           )}
                         </td>

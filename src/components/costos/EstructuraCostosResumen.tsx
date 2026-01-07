@@ -619,7 +619,7 @@ export default function EstructuraCostosResumen({
             <ArrowLeft className="h-4 w-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)]" />
           </button>
           <h1 className="text-xs font-semibold text-[var(--text-primary)]">
-            <span className="hidden sm:inline">Gestión de Costos - Detalle completo de presupuesto, APU y costos reales</span>
+            <span className="hidden sm:inline">Gestión de Costos - {estructuraData?.presupuesto?.nombre_presupuesto || 'Cargando...'}</span>
             <span className="sm:hidden">Gestión de Costos</span>
           </h1>
         </div>

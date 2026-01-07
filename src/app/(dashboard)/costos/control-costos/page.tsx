@@ -38,28 +38,54 @@ function ControlCostosContent() {
   const proyectos = data?.data || [];
   const pagination = data?.pagination;
 
-  // Filtrar proyectos por búsqueda en el cliente (ya que el endpoint no soporta búsqueda aún)
+  // Filtrar proyectos por búsqueda en el cliente y filtrar solo presupuestos META vigentes
   const proyectosFiltrados = useMemo(() => {
+    // Primero filtrar proyectos que tienen al menos un presupuesto META vigente
+    const proyectosConMetaVigente = proyectos
+      .filter(proyecto => proyecto.presupuestos) // Asegurar que presupuestos existe
+      .map(proyecto => ({
+        ...proyecto,
+        presupuestos: proyecto.presupuestos!.filter(presupuesto =>
+          presupuesto.fase === 'META' &&
+          presupuesto.id_presupuesto_meta_vigente !== null &&
+          presupuesto.version_meta_vigente !== null
+        )
+      }))
+      .filter(proyecto => proyecto.presupuestos.length > 0);
+
+    // Luego aplicar búsqueda por texto
     if (!searchQuery.trim()) {
-      return proyectos;
+      return proyectosConMetaVigente;
     }
     const query = searchQuery.toLowerCase().trim();
-    return proyectos.filter(
-      (proyecto) =>
-        proyecto.nombre_proyecto.toLowerCase().includes(query) ||
-        proyecto.cliente.toLowerCase().includes(query) ||
-        proyecto.empresa.toLowerCase().includes(query) ||
-        proyecto.id_proyecto.toLowerCase().includes(query)
+    return proyectosConMetaVigente.filter(
+      (proyecto) => {
+        // Verificaciones básicas del proyecto
+        const proyectoMatch =
+          proyecto.nombre_proyecto.toLowerCase().includes(query) ||
+          proyecto.cliente.toLowerCase().includes(query) ||
+          proyecto.empresa.toLowerCase().includes(query) ||
+          proyecto.id_proyecto.toLowerCase().includes(query);
+
+        // Verificación de presupuestos (ya sabemos que existe porque pasaron el filtro anterior)
+        const presupuestosMatch = proyecto.presupuestos.some(presupuesto =>
+          presupuesto.nombre_presupuesto.toLowerCase().includes(query) ||
+          presupuesto.id_presupuesto.toLowerCase().includes(query)
+        );
+
+        return proyectoMatch || presupuestosMatch;
+      }
     );
   }, [proyectos, searchQuery]);
 
+
+
+  const hasActiveFilters = !!searchQuery;
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     // setCurrentPage ya se resetea automáticamente en el hook
   };
-
-  const hasActiveFilters = !!searchQuery;
 
   return (
     <div className="space-y-3">

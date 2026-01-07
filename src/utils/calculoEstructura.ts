@@ -269,8 +269,9 @@ export function calcularPartidas(
       // precio_unitario = costo_directo
       const precio_unitario = costo_directo;
 
-      // parcial_partida = metrado × precio_unitario
-      const parcial_partida = roundToTwo((partida.metrado || 0) * precio_unitario);
+      // parcial_partida = metrado × precio_unitario (metrado redondeado a 2 decimales)
+      const metradoRedondeado = roundToTwo(partida.metrado || 0);
+      const parcial_partida = roundToTwo(metradoRedondeado * precio_unitario);
 
       return {
         id_partida: partida.id_partida,
