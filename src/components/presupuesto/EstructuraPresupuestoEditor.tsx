@@ -1063,13 +1063,6 @@ export default function EstructuraPresupuestoEditor({
           const partidasDelTitulo = partidas.filter(p => p.id_titulo === tituloSeleccionado.id_titulo && p.id_partida_padre === null);
           partidasDelTitulo.forEach(p => itemsMismoPadre.push({ orden: p.orden }));
           
-          console.log(`[handleCrearTitulo] Creando título hijo de "${tituloSeleccionado.descripcion}":`, {
-            id_padre: tituloSeleccionado.id_titulo,
-            titulosHijos: titulosHijos.map(t => ({ id: t.id_titulo, descripcion: t.descripcion, orden: t.orden })),
-            partidasDelTitulo: partidasDelTitulo.map(p => ({ id: p.id_partida, descripcion: p.descripcion, orden: p.orden })),
-            itemsMismoPadre: itemsMismoPadre.map(item => item.orden),
-            nuevoOrden: itemsMismoPadre.length > 0 ? Math.max(...itemsMismoPadre.map(item => item.orden)) + 1 : 1
-          });
           
           nuevoOrden = itemsMismoPadre.length > 0
             ? Math.max(...itemsMismoPadre.map(item => item.orden)) + 1
@@ -1161,13 +1154,6 @@ export default function EstructuraPresupuestoEditor({
           const partidasDelTitulo = partidas.filter(p => p.id_titulo === nuevoIdTitulo && p.id_partida_padre === null);
           partidasDelTitulo.forEach(p => itemsMismoTitulo.push({ orden: p.orden }));
           
-          console.log(`[handleCrearPartida] Creando partida en título "${tituloSeleccionado.descripcion}":`, {
-            id_titulo: nuevoIdTitulo,
-            titulosHijos: titulosHijos.map(t => ({ id: t.id_titulo, descripcion: t.descripcion, orden: t.orden })),
-            partidasDelTitulo: partidasDelTitulo.map(p => ({ id: p.id_partida, descripcion: p.descripcion, orden: p.orden })),
-            itemsMismoTitulo: itemsMismoTitulo.map(item => item.orden),
-            nuevoOrden: itemsMismoTitulo.length > 0 ? Math.max(...itemsMismoTitulo.map(item => item.orden)) + 1 : 1
-          });
           
           nuevoOrden = itemsMismoTitulo.length > 0
             ? Math.max(...itemsMismoTitulo.map(item => item.orden)) + 1
@@ -3485,7 +3471,11 @@ export default function EstructuraPresupuestoEditor({
 
     try {
       setIsSaving(true);
-      
+
+      // ✅ LIMPIAR TEMPORALES AL INICIO - Evitar residuos problemáticos de integraciones anteriores
+      setApusTemporales([]);
+      setPreciosCompartidosTemporales([]);
+
       // Preparar datos para la mutación batch
       const tiempoPreparacion = performance.now();
       const mapeoIdsTitulos: Map<string, string> = new Map(); // temp_id -> real_id (se llenará con la respuesta)
@@ -3728,7 +3718,13 @@ export default function EstructuraPresupuestoEditor({
         queryKey: ['estructura-presupuesto', id_presupuesto],
       });
       const tiempoRefetchTotal = performance.now() - tiempoRefetchInicio;
-      
+
+      // ✅ REFETCH EXITOSO: Limpiar temporales porque ahora están guardados como reales
+      if (estructuraCalculada) {
+        setApusTemporales([]);
+        setPreciosCompartidosTemporales([]);
+      }
+
       // El hook ya calculó parcial_presupuesto, monto_igv, monto_utilidad y total_presupuesto
       // Solo tomamos esos valores que ya están calculados y los guardamos en backend
       if (estructuraCalculada?.presupuesto) {
@@ -3783,6 +3779,11 @@ export default function EstructuraPresupuestoEditor({
     } catch (error: any) {
       console.error('Error al guardar cambios:', error);
       toast.error(error?.message || 'Error al guardar los cambios. Se hizo rollback de todas las operaciones.');
+
+      // ✅ LIMPIAR TEMPORALES CUANDO FALLA - Evitar residuos problemáticos
+      console.log(`[FRONTEND] ❌ Batch falló - limpiando temporales problemáticos`);
+      setApusTemporales([]);
+      setPreciosCompartidosTemporales([]);
     } finally {
       setIsSaving(false);
     }

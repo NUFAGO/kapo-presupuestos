@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { executeQuery, executeMutation } from '@/services/graphql-client';
-import { GET_PRESUPUESTOS_BY_PROYECTO_QUERY, GET_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY, GET_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY, LIST_PRESUPUESTOS_QUERY, GET_PRESUPUESTOS_PAGINATED_QUERY } from '@/graphql/queries/presupuesto.queries';
+import { GET_PRESUPUESTOS_BY_PROYECTO_QUERY, GET_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY, GET_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_META_VIGENTES_QUERY, LIST_PRESUPUESTOS_QUERY, GET_PRESUPUESTOS_PAGINATED_QUERY } from '@/graphql/queries/presupuesto.queries';
 import { ADD_PRESUPUESTO_MUTATION, UPDATE_PRESUPUESTO_MUTATION, DELETE_PRESUPUESTO_MUTATION, CREAR_PRESUPUESTO_PADRE_MUTATION, CREAR_VERSION_DESDE_PADRE_MUTATION, CREAR_VERSION_DESDE_VERSION_MUTATION, ENVIAR_A_LICITACION_MUTATION, PASAR_A_CONTRACTUAL_MUTATION, CREAR_PRESUPUESTO_META_DESDE_CONTRACTUAL_MUTATION, ACTUALIZAR_PRESUPUESTO_PADRE_MUTATION, ELIMINAR_GRUPO_PRESUPUESTO_COMPLETO_MUTATION, ENVIAR_VERSION_META_A_APROBACION_MUTATION, ENVIAR_VERSION_META_A_OFICIALIZACION_MUTATION } from '@/graphql/mutations/presupuesto.mutations';
 import { useAuth } from '@/context/auth-context';
 import toast from 'react-hot-toast';
@@ -57,6 +57,10 @@ export interface Presupuesto {
 export interface ProyectoConPresupuestos {
   id_proyecto: string;
   nombre_proyecto: string | null; // Puede ser null según BD
+  cliente?: string;
+  empresa?: string;
+  fecha_creacion?: string;
+  total_proyecto?: number;
   presupuestos: Presupuesto[];
 }
 
@@ -222,6 +226,58 @@ export function useProyectosConPresupuestosPorFase(
         data: proyectosNormalizados,
         pagination: response.getProyectosConPresupuestosPorFase.pagination,
         totals: response.getProyectosConPresupuestosPorFase.totals
+      };
+    },
+    staleTime: 30000, // 30 segundos
+  });
+}
+
+/**
+ * Hook para obtener proyectos con presupuestos META vigentes (con búsqueda server-side)
+ */
+export function useProyectosConMetaVigenteConSearch(
+  pagination?: { page: number; limit: number; sortBy?: string; sortOrder?: 'asc' | 'desc' },
+  searchQuery?: string | null
+) {
+  return useQuery({
+    queryKey: ['proyectos-meta-vigente-con-search', pagination?.page, pagination?.limit, searchQuery],
+    queryFn: async () => {
+      const search = searchQuery && searchQuery.trim()
+        ? { query: searchQuery.trim(), fields: ['nombre_presupuesto', 'id_presupuesto'] }
+        : null;
+
+      const response = await executeQuery<{
+        getProyectosConPresupuestosMetaVigentes: {
+          data: ProyectoConPresupuestos[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+          };
+          totals: {
+            total_proyectos: number;
+            total_presupuestos: number;
+          };
+        }
+      }>(
+        GET_PROYECTOS_CON_PRESUPUESTOS_META_VIGENTES_QUERY,
+        {
+          pagination,
+          search,
+        }
+      );
+
+      // Normalizar todos los presupuestos en cada proyecto
+      const proyectosNormalizados = response.getProyectosConPresupuestosMetaVigentes.data.map(proyecto => ({
+        ...proyecto,
+        presupuestos: proyecto.presupuestos.map(normalizarPresupuesto)
+      }));
+
+      return {
+        data: proyectosNormalizados,
+        pagination: response.getProyectosConPresupuestosMetaVigentes.pagination,
+        totals: response.getProyectosConPresupuestosMetaVigentes.totals
       };
     },
     staleTime: 30000, // 30 segundos

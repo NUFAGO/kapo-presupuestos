@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { LoadingSpinner } from '@/components/ui';
 import ProyectoConPresupuestosCard from './components/ProyectoConPresupuestosCard';
 import Pagination from '../../proyectos/components/Pagination';
-import { useProyectosConMetaVigente } from '@/hooks/useProyectos';
+import { useProyectosConMetaVigenteConSearch } from '@/hooks/usePresupuestos';
 import { usePageState } from '@/hooks/usePageState';
 import { PaginationInput } from '@/services/proyecto-service';
 import type { Proyecto } from '@/services/proyecto-service';
@@ -23,60 +23,20 @@ function ControlCostosContent() {
   } = usePageState('control-costos');
 
   // Preparar input para la query
-  const queryInput: PaginationInput = useMemo(() => {
+  const paginationInput = useMemo(() => {
     return {
       page: currentPage,
       limit: ITEMS_PER_PAGE,
       sortBy: 'fecha_creacion',
-      sortOrder: 'desc',
+      sortOrder: 'desc' as const,
     };
   }, [currentPage]);
 
-  // Obtener proyectos con meta vigente
-  const { data, isLoading, error } = useProyectosConMetaVigente(queryInput);
+  // Obtener proyectos con meta vigente (server-side search)
+  const { data, isLoading, error } = useProyectosConMetaVigenteConSearch(paginationInput, searchQuery);
 
-  const proyectos = data?.data || [];
+  const proyectosFiltrados = data?.data || [];
   const pagination = data?.pagination;
-
-  // Filtrar proyectos por búsqueda en el cliente y filtrar solo presupuestos META vigentes
-  const proyectosFiltrados = useMemo(() => {
-    // Primero filtrar proyectos que tienen al menos un presupuesto META vigente
-    const proyectosConMetaVigente = proyectos
-      .filter(proyecto => proyecto.presupuestos) // Asegurar que presupuestos existe
-      .map(proyecto => ({
-        ...proyecto,
-        presupuestos: proyecto.presupuestos!.filter(presupuesto =>
-          presupuesto.fase === 'META' &&
-          presupuesto.id_presupuesto_meta_vigente !== null &&
-          presupuesto.version_meta_vigente !== null
-        )
-      }))
-      .filter(proyecto => proyecto.presupuestos.length > 0);
-
-    // Luego aplicar búsqueda por texto
-    if (!searchQuery.trim()) {
-      return proyectosConMetaVigente;
-    }
-    const query = searchQuery.toLowerCase().trim();
-    return proyectosConMetaVigente.filter(
-      (proyecto) => {
-        // Verificaciones básicas del proyecto
-        const proyectoMatch =
-          proyecto.nombre_proyecto.toLowerCase().includes(query) ||
-          proyecto.cliente.toLowerCase().includes(query) ||
-          proyecto.empresa.toLowerCase().includes(query) ||
-          proyecto.id_proyecto.toLowerCase().includes(query);
-
-        // Verificación de presupuestos (ya sabemos que existe porque pasaron el filtro anterior)
-        const presupuestosMatch = proyecto.presupuestos.some(presupuesto =>
-          presupuesto.nombre_presupuesto.toLowerCase().includes(query) ||
-          presupuesto.id_presupuesto.toLowerCase().includes(query)
-        );
-
-        return proyectoMatch || presupuestosMatch;
-      }
-    );
-  }, [proyectos, searchQuery]);
 
 
 

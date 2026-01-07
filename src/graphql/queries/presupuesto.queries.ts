@@ -312,6 +312,58 @@ export const GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY = `
   }
 `;
 
+export const GET_PROYECTOS_CON_PRESUPUESTOS_META_VIGENTES_QUERY = `
+  query GetProyectosConPresupuestosMetaVigentes($estado: EstadoPresupuesto, $id_proyecto: String, $pagination: PaginationInput, $search: SearchInput) {
+    getProyectosConPresupuestosMetaVigentes(estado: $estado, id_proyecto: $id_proyecto, pagination: $pagination, search: $search) {
+      data {
+        id_proyecto
+        nombre_proyecto
+        cliente
+        empresa
+        fecha_creacion
+        total_proyecto
+        presupuestos {
+          _id
+          id_presupuesto
+          nombre_presupuesto
+          fase
+          estado
+          costo_directo
+          monto_igv
+          monto_utilidad
+          parcial_presupuesto
+          total_presupuesto
+          porcentaje_igv
+          porcentaje_utilidad
+          plazo
+          ppto_base
+          ppto_oferta
+          fecha_creacion
+          id_presupuesto_meta_vigente
+          version_meta_vigente
+          estado_aprobacion {
+            tipo
+            estado
+            id_aprobacion
+          }
+          es_inmutable
+          es_activo
+        }
+      }
+      pagination {
+        page
+        limit
+        total
+        totalPages
+      }
+      totals {
+        total_proyectos
+        total_presupuestos
+      }
+    }
+  }
+`;
+
 // La jerarquía se construye en el frontend usando id_titulo_padre e id_partida_padre
 // AHORA INCLUYE APUs completos para calcular precio_unitario y parcial_partida en frontend
 export const GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY = `

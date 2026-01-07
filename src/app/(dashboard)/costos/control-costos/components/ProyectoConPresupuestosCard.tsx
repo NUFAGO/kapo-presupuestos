@@ -2,10 +2,11 @@
 
 import { Calendar, DollarSign, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { Proyecto, Presupuesto } from '@/services/proyecto-service';
+import type { Proyecto } from '@/services/proyecto-service';
+import type { ProyectoConPresupuestos, Presupuesto } from '@/hooks/usePresupuestos';
 
 interface ProyectoConPresupuestosCardProps {
-  proyecto: Proyecto;
+  proyecto: ProyectoConPresupuestos;
 }
 
 export default function ProyectoConPresupuestosCard({ proyecto }: ProyectoConPresupuestosCardProps) {
@@ -63,10 +64,10 @@ export default function ProyectoConPresupuestosCard({ proyecto }: ProyectoConPre
               <div className="flex items-center gap-1 flex-shrink-0">
                 <Calendar className="h-2.5 w-2.5" />
                 <span>
-                  {new Date(proyecto.fecha_creacion).toLocaleDateString('es-ES', {
+                  {proyecto.fecha_creacion ? new Date(proyecto.fecha_creacion).toLocaleDateString('es-ES', {
                     month: 'short',
                     day: 'numeric',
-                  })}
+                  }) : 'Sin fecha'}
                 </span>
               </div>
               {proyecto.total_proyecto !== null && proyecto.total_proyecto !== undefined && (
