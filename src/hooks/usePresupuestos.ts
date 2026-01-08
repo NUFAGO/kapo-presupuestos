@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { executeQuery, executeMutation } from '@/services/graphql-client';
-import { GET_PRESUPUESTOS_BY_PROYECTO_QUERY, GET_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY, GET_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_META_VIGENTES_QUERY, LIST_PRESUPUESTOS_QUERY, GET_PRESUPUESTOS_PAGINATED_QUERY } from '@/graphql/queries/presupuesto.queries';
+import { GET_PRESUPUESTOS_BY_PROYECTO_QUERY, GET_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_QUERY, GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY, GET_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY, GET_PROYECTOS_CON_PRESUPUESTOS_META_VIGENTES_QUERY, LIST_PRESUPUESTOS_QUERY, GET_PRESUPUESTOS_PAGINATED_QUERY, GET_ESTADISTICAS_DASHBOARD_QUERY } from '@/graphql/queries/presupuesto.queries';
 import { ADD_PRESUPUESTO_MUTATION, UPDATE_PRESUPUESTO_MUTATION, DELETE_PRESUPUESTO_MUTATION, CREAR_PRESUPUESTO_PADRE_MUTATION, CREAR_VERSION_DESDE_PADRE_MUTATION, CREAR_VERSION_DESDE_VERSION_MUTATION, ENVIAR_A_LICITACION_MUTATION, PASAR_A_CONTRACTUAL_MUTATION, CREAR_PRESUPUESTO_META_DESDE_CONTRACTUAL_MUTATION, ACTUALIZAR_PRESUPUESTO_PADRE_MUTATION, ELIMINAR_GRUPO_PRESUPUESTO_COMPLETO_MUTATION, ENVIAR_VERSION_META_A_APROBACION_MUTATION, ENVIAR_VERSION_META_A_OFICIALIZACION_MUTATION } from '@/graphql/mutations/presupuesto.mutations';
 import { useAuth } from '@/context/auth-context';
 import toast from 'react-hot-toast';
@@ -1269,6 +1269,51 @@ export function useBuscarPresupuestosPlantillas(
       };
     },
     staleTime: 2 * 60 * 1000, // 2 minutos (más fresco para búsquedas)
+  });
+}
+
+/**
+ * Hook para obtener estadísticas del dashboard (contadores independientes)
+ */
+export function useEstadisticasDashboard() {
+  return useQuery<{
+    presupuestosPorFase: {
+      BORRADOR: number;
+      LICITACION: number;
+      CONTRACTUAL: number;
+      META: number;
+    };
+    aprobacionesPendientes: {
+      LICITACION_A_CONTRACTUAL: number;
+      CONTRACTUAL_A_META: number;
+      NUEVA_VERSION_META: number;
+      OFICIALIZAR_META: number;
+      total: number;
+    };
+  }>({
+    queryKey: ['estadisticas-dashboard'],
+    queryFn: async () => {
+      const result = await executeQuery<{ getEstadisticasDashboard: {
+        presupuestosPorFase: {
+          BORRADOR: number;
+          LICITACION: number;
+          CONTRACTUAL: number;
+          META: number;
+        };
+        aprobacionesPendientes: {
+          LICITACION_A_CONTRACTUAL: number;
+          CONTRACTUAL_A_META: number;
+          NUEVA_VERSION_META: number;
+          OFICIALIZAR_META: number;
+          total: number;
+        };
+      } }>(GET_ESTADISTICAS_DASHBOARD_QUERY);
+
+      return result.getEstadisticasDashboard;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutos (datos no cambian tan frecuentemente)
+    refetchOnWindowFocus: false,
+    retry: 2
   });
 }
 

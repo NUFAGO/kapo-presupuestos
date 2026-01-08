@@ -587,3 +587,23 @@ export const GET_ESTRUCTURA_PRESUPUESTO_QUERY = `
     }
   }
 `;
+
+export const GET_ESTADISTICAS_DASHBOARD_QUERY = `
+  query GetEstadisticasDashboard {
+    getEstadisticasDashboard {
+      presupuestosPorFase {
+        BORRADOR
+        LICITACION
+        CONTRACTUAL
+        META
+      }
+      aprobacionesPendientes {
+        LICITACION_A_CONTRACTUAL
+        CONTRACTUAL_A_META
+        NUEVA_VERSION_META
+        OFICIALIZAR_META
+        total
+      }
+    }
+  }
+`;

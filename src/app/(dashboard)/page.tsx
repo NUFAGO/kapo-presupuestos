@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, RefreshCw, DollarSign, Target, BarChart3, X, Calendar, Filter, FileText, Layers, Building2, TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon, BarChart2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, DollarSign, Target, BarChart3, X, Calendar, Filter, FileText, Layers, Building2, TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon, BarChart2, FileCheck, ArrowRight, RotateCcw, CheckCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { SelectSearch } from '@/components/ui/select-search';
-import { usePresupuestosPorFase } from '@/hooks/usePresupuestos';
+import { usePresupuestosPorFase, useEstadisticasDashboard } from '@/hooks/usePresupuestos';
 import { useProyectosConMetaVigente } from '@/hooks/useProyectos';
 import { useResumenPresupuesto, useHistoricoMensual, type FiltrosResumen } from '@/hooks/useResumenPresupuesto';
 
@@ -116,6 +116,23 @@ const datosVacios: ResumenPresupuestoData = {
   historico_mensual: []
 };
 
+// Tipos para estadísticas del dashboard
+interface EstadisticasDashboard {
+  presupuestosPorFase: {
+    BORRADOR: number;
+    LICITACION: number;
+    CONTRACTUAL: number;
+    META: number;
+  };
+  aprobacionesPendientes: {
+    LICITACION_A_CONTRACTUAL: number;
+    CONTRACTUAL_A_META: number;
+    NUEVA_VERSION_META: number;
+    OFICIALIZAR_META: number;
+    total: number;
+  };
+}
+
 export default function DashboardPage() {
   // Estados para filtros UI (lo que ve el usuario)
   const [filtroProyectoUI, setFiltroProyectoUI] = useState<string>('');
@@ -137,6 +154,26 @@ export default function DashboardPage() {
     sortOrder: 'asc',
   });
   const proyectos = proyectosData?.data || [];
+
+  // Estadísticas del dashboard (carga independiente)
+  const { data: estadisticasData, isLoading: isLoadingEstadisticas } = useEstadisticasDashboard();
+
+  // Datos de fallback mientras carga
+  const estadisticas: EstadisticasDashboard = (estadisticasData as EstadisticasDashboard) ?? {
+    presupuestosPorFase: {
+      BORRADOR: 0,
+      LICITACION: 0,
+      CONTRACTUAL: 0,
+      META: 0
+    },
+    aprobacionesPendientes: {
+      LICITACION_A_CONTRACTUAL: 0,
+      CONTRACTUAL_A_META: 0,
+      NUEVA_VERSION_META: 0,
+      OFICIALIZAR_META: 0,
+      total: 0
+    }
+  };
 
   // Obtener presupuestos meta vigentes para el filtro
   // Si hay un proyecto seleccionado en UI, filtrar por ese proyecto
@@ -518,91 +555,99 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* APU Meta */}
-          {/* 
-            Esta sección muestra métricas AGREGADAS de APU de todos los presupuestos meta vigentes:
-            - Eficiencia: Compara costo meta vs costo actual (mayor = mejor)
-            - Varianza: Diferencia porcentual entre costo actual y meta (negativo = ahorro, positivo = sobrecosto)
-            - Progreso: Porcentaje de avance basado en recepciones
-            - Costo por Unidad: Promedio ponderado de todos los presupuestos
-            - Total Composición: Suma de total_composicion de todos los recursos
-            
-            Los datos vendrán de la tabla ResumenPresupuesto (backend) que agregará:
-            - total_composicion: Suma de total_composicion de todos los recursos de todos los presupuestos meta vigentes
-            - total_unidades: Suma de metrados de todas las partidas
-            - costo_por_unidad_meta/actual: Calculados como promedios ponderados
-            
-            Filtros que se implementarán:
-            - Por Presupuesto (select múltiple)
-            - Por Proyecto (select)
-            - Por Rango de Fechas (para histórico mensual)
-          */}
+          {/* Estado del Sistema */}
           <div className="bg-[var(--background)] backdrop-blur-sm rounded-lg card-shadow overflow-hidden">
-            <div className="bg-[var(--card-bg)] px-3 py-2 border-b border-[var(--border-color)]">
-              <h2 className="text-xs font-semibold text-[var(--text-primary)]">APU Meta</h2>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-tight">
-                Agregado de todos los presupuestos meta vigentes
-              </p>
-            </div>
-            <div className="p-3">
-              <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="p-4">
+              {/* Sección 1: Resumen de Presupuestos */}
+              <div className="mb-4">
+                <h3 className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <BarChart2 className="h-3.5 w-3.5" />
+                  Resumen de Presupuestos
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
                 <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 card-shadow">
                   <div className="flex items-center gap-1.5 mb-1">
-                    <TrendingUp className="h-3.5 w-3.5 text-green-600" />
-                    <span className="text-[11px] text-[var(--text-secondary)]">Eficiencia</span>
+                      <FileText className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                      <span className="text-[11px] text-[var(--text-secondary)]">META</span>
+                      {isLoadingEstadisticas && <div className="w-1 h-1 bg-green-600 rounded-full animate-pulse"></div>}
+                    </div>
+                    <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                      {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.META}
                   </div>
-                  <div className="text-xl font-bold text-green-600">{(datos.eficiencia ?? 0).toFixed(1)}%</div>
                 </div>
                 
-                <div className={`rounded-lg p-2 card-shadow ${
-                  (datos.varianza ?? 0) < 0
-                    ? 'bg-green-50 dark:bg-green-950/20' 
-                    : 'bg-orange-50 dark:bg-orange-950/20'
-                }`}>
+                  <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-2 card-shadow">
                   <div className="flex items-center gap-1.5 mb-1">
-                    {(datos.varianza ?? 0) < 0 ? (
-                      <TrendingDown className="h-3.5 w-3.5 text-green-600" />
-                    ) : (
-                      <TrendingUp className="h-3.5 w-3.5 text-orange-600" />
-                    )}
-                    <span className="text-[10px] text-[var(--text-secondary)]">Varianza</span>
+                      <Layers className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                      <span className="text-[11px] text-[var(--text-secondary)]">Licitación</span>
+                      {isLoadingEstadisticas && <div className="w-1 h-1 bg-orange-600 rounded-full animate-pulse"></div>}
                   </div>
-                  <div className={`text-xl font-bold ${(datos.varianza ?? 0) < 0 ? 'text-green-600' : 'text-orange-600'}`}>
-                    {(datos.varianza ?? 0) > 0 ? '+' : ''}{(datos.varianza ?? 0).toFixed(1)}%
-                  </div>
+                    <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                      {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.LICITACION}
                 </div>
               </div>
               
-              <div className="mb-3">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[11px] text-[var(--text-secondary)]">Progreso del Proyecto</span>
-                  <span className="text-[11px] font-semibold text-[var(--text-primary)]">{(datos.progreso_proyecto ?? 0).toFixed(1)}% completado</span>
+                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2 card-shadow">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <FileCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      <span className="text-[11px] text-[var(--text-secondary)]">Contractual</span>
+                      {isLoadingEstadisticas && <div className="w-1 h-1 bg-blue-600 rounded-full animate-pulse"></div>}
+                    </div>
+                    <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                      {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.CONTRACTUAL}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-2 card-shadow">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Target className="h-3.5 w-3.5 text-gray-600" />
+                      <span className="text-[11px] text-[var(--text-secondary)]">Borrador</span>
+                      {isLoadingEstadisticas && <div className="w-1 h-1 bg-gray-600 rounded-full animate-pulse"></div>}
+                    </div>
+                    <div className="text-xl font-bold text-gray-600">
+                      {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.BORRADOR}
+                    </div>
                 </div>
-                <div className="w-full bg-[var(--card-bg)] rounded-full h-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full transition-all"
-                    style={{ width: `${datos.progreso_proyecto ?? 0}%` }}
-                  />
                 </div>
               </div>
               
-              <div className="space-y-1.5 text-[11px] border-t border-[var(--border-color)] pt-2">
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Costo por Unidad (APU)</span>
-                  <span className="font-semibold text-[var(--text-primary)]">S/ {(datos.costo_por_unidad_actual ?? 0).toFixed(2)}</span>
+              {/* Separador */}
+              <div className="border-t border-[var(--border-color)] my-3"></div>
+
+              {/* Sección 2: Aprobaciones Pendientes */}
+              <div className="space-y-1.5 text-[12px]">
+                <h3 className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Aprobaciones Pendientes
+                </h3>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5 ">
+                    <ArrowRight className="h-3 w-3 text-blue-500" />
+                    <span className="text-[var(--text-secondary)]">Licitación → Contractual</span>
+                    {isLoadingEstadisticas && <div className="w-1 h-1 bg-blue-500 rounded-full animate-pulse"></div>}
+                  </div>
+                  <span className="font-semibold text-[var(--text-primary)] bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded text-xs">
+                    {isLoadingEstadisticas ? '...' : `${estadisticas.aprobacionesPendientes.LICITACION_A_CONTRACTUAL} pendientes`}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Meta</span>
-                  <span className="font-semibold text-[var(--text-primary)]">S/ {(datos.costo_por_unidad_meta ?? 0).toFixed(2)}</span>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5">
+                    <RotateCcw className="h-3 w-3 text-purple-500" />
+                    <span className="text-[var(--text-secondary)]">Nueva Versión Meta</span>
+                    {isLoadingEstadisticas && <div className="w-1 h-1 bg-purple-500 rounded-full animate-pulse"></div>}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Unidades Totales</span>
-                  <span className="font-semibold text-[var(--text-primary)]">{(datos.total_unidades ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+                  <span className="font-semibold text-[var(--text-primary)] bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 rounded text-xs">
+                    {isLoadingEstadisticas ? '...' : `${estadisticas.aprobacionesPendientes.NUEVA_VERSION_META} pendientes`}
+                  </span>
                 </div>
                 <div className="flex justify-between border-t border-[var(--border-color)] pt-1.5 mt-1.5">
-                  <span className="text-[var(--text-secondary)] font-semibold">Total Composición</span>
-                  <span className="font-bold text-sm text-[var(--text-primary)]">
-                    S/ {datos.total_composicion.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  <span className="text-[var(--text-secondary)] font-semibold flex items-center gap-1.5">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Total Aprobaciones Pendientes
+                    {isLoadingEstadisticas && <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></div>}
+                  </span>
+                  <span className="font-bold text-base text-green-600">
+                    {isLoadingEstadisticas ? '...' : estadisticas.aprobacionesPendientes.total}
                   </span>
                 </div>
               </div>
