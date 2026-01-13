@@ -32,6 +32,7 @@ export interface Presupuesto {
   fecha_creacion: string;
   observaciones: string;
   numeracion_presupuesto?: number;
+  gastos_generales?: number;
   fase?: 'BORRADOR' | 'LICITACION' | 'CONTRACTUAL' | 'META';
   version?: number | null;
   descripcion_version?: string;
@@ -408,6 +409,7 @@ export interface EstructuraPresupuesto {
   precios_compartidos?: PrecioCompartidoEstructura[]; // NUEVO: Precios compartidos para cálculos en frontend
   porcentaje_igv_padre?: number | null; // Porcentajes del presupuesto padre para cálculos
   porcentaje_utilidad_padre?: number | null; // Porcentajes del presupuesto padre para cálculos
+  gastos_generales_padre?: number | null; // Gastos generales del presupuesto padre para cálculos
 }
 
 /**
@@ -601,8 +603,8 @@ export function useEstructuraPresupuesto(id_presupuesto: string | null) {
       // 2. Subtotal (precio de venta) = costo directo + utilidad
       // 3. IGV sobre el subtotal (precio de venta)
       // 4. Total = subtotal + IGV
-      // IMPORTANTE: Usar porcentajes del presupuesto padre (vienen en la estructura)
-      // Si están disponibles porcentaje_igv_padre y porcentaje_utilidad_padre, usarlos
+      // IMPORTANTE: Usar valores del presupuesto padre (vienen en la estructura)
+      // Si están disponibles los valores del padre, usarlos
       // Si no, usar los del presupuesto actual (para presupuestos padre o antiguos)
       const porcentajeIGV = estructura.porcentaje_igv_padre !== undefined && estructura.porcentaje_igv_padre !== null
         ? estructura.porcentaje_igv_padre
@@ -610,9 +612,12 @@ export function useEstructuraPresupuesto(id_presupuesto: string | null) {
       const porcentajeUtilidad = estructura.porcentaje_utilidad_padre !== undefined && estructura.porcentaje_utilidad_padre !== null
         ? estructura.porcentaje_utilidad_padre
         : (estructura.presupuesto.porcentaje_utilidad || 0);
-      
+      const gastosGenerales = estructura.gastos_generales_padre !== undefined && estructura.gastos_generales_padre !== null
+        ? estructura.gastos_generales_padre
+        : (estructura.presupuesto.gastos_generales || 0);
+
       const montoUtilidad = Math.round(parcialPresupuesto * porcentajeUtilidad / 100 * 100) / 100;
-      const subtotalVenta = Math.round((parcialPresupuesto + montoUtilidad) * 100) / 100;
+      const subtotalVenta = Math.round((parcialPresupuesto + gastosGenerales + montoUtilidad) * 100) / 100;
       const montoIGV = Math.round(subtotalVenta * porcentajeIGV / 100 * 100) / 100;
       const totalPresupuesto = Math.round((subtotalVenta + montoIGV) * 100) / 100;
 
@@ -742,6 +747,7 @@ export function useUpdatePresupuestoPadre() {
       nombre_presupuesto?: string;
       porcentaje_igv?: number;
       porcentaje_utilidad?: number;
+      gastos_generales?: number;
     }) => {
       const response = await executeMutation<{ actualizarPresupuestoPadre: Presupuesto }>(
         ACTUALIZAR_PRESUPUESTO_PADRE_MUTATION,

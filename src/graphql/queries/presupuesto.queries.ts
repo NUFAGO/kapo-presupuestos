@@ -16,6 +16,7 @@ export const GET_PRESUPUESTOS_BY_PROYECTO_QUERY = `
       total_presupuesto
       porcentaje_igv
       porcentaje_utilidad
+      gastos_generales
       plazo
       ppto_base
       ppto_oferta
@@ -60,6 +61,7 @@ export const GET_PRESUPUESTO_QUERY = `
       total_presupuesto
       porcentaje_igv
       porcentaje_utilidad
+      gastos_generales
       plazo
       ppto_base
       ppto_oferta
@@ -104,6 +106,7 @@ export const LIST_PRESUPUESTOS_QUERY = `
       total_presupuesto
       porcentaje_igv
       porcentaje_utilidad
+      gastos_generales
       plazo
       ppto_base
       ppto_oferta
@@ -149,6 +152,7 @@ export const GET_PRESUPUESTOS_PAGINATED_QUERY = `
         total_presupuesto
         porcentaje_igv
         porcentaje_utilidad
+        gastos_generales
         plazo
         ppto_base
         ppto_oferta
@@ -203,6 +207,7 @@ export const GET_PRESUPUESTOS_POR_FASE_QUERY = `
         total_presupuesto
         porcentaje_igv
         porcentaje_utilidad
+        gastos_generales
         plazo
         ppto_base
         ppto_oferta
@@ -266,6 +271,7 @@ export const GET_PROYECTOS_CON_PRESUPUESTOS_POR_FASE_QUERY = `
           total_presupuesto
           porcentaje_igv
           porcentaje_utilidad
+          gastos_generales
           plazo
           ppto_base
           ppto_oferta
@@ -335,6 +341,7 @@ export const GET_PROYECTOS_CON_PRESUPUESTOS_META_VIGENTES_QUERY = `
           total_presupuesto
           porcentaje_igv
           porcentaje_utilidad
+          gastos_generales
           plazo
           ppto_base
           ppto_oferta
@@ -381,6 +388,7 @@ export const GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY = `
         total_presupuesto
         porcentaje_igv
         porcentaje_utilidad
+        gastos_generales
         plazo
         ppto_base
         ppto_oferta
@@ -473,6 +481,7 @@ export const GET_ESTRUCTURA_PRESUPUESTO_PARA_PLANTILLA_QUERY = `
       }
       porcentaje_igv_padre
       porcentaje_utilidad_padre
+      gastos_generales_padre
     }
   }
 `;
@@ -492,6 +501,7 @@ export const GET_ESTRUCTURA_PRESUPUESTO_QUERY = `
         total_presupuesto
         porcentaje_igv
         porcentaje_utilidad
+        gastos_generales
         plazo
         ppto_base
         ppto_oferta
@@ -584,6 +594,7 @@ export const GET_ESTRUCTURA_PRESUPUESTO_QUERY = `
       }
       porcentaje_igv_padre
       porcentaje_utilidad_padre
+      gastos_generales_padre
     }
   }
 `;

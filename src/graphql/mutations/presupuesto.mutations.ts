@@ -18,6 +18,7 @@ export const ADD_PRESUPUESTO_MUTATION = `
     $ppto_base: Float!
     $ppto_oferta: Float!
     $total_presupuesto: Float!
+    $gastos_generales: Float
   ) {
     addPresupuesto(
       id_proyecto: $id_proyecto
@@ -34,6 +35,7 @@ export const ADD_PRESUPUESTO_MUTATION = `
       ppto_base: $ppto_base
       ppto_oferta: $ppto_oferta
       total_presupuesto: $total_presupuesto
+      gastos_generales: $gastos_generales
     ) {
       _id
       id_presupuesto
@@ -52,6 +54,7 @@ export const ADD_PRESUPUESTO_MUTATION = `
       fecha_creacion
       observaciones
       numeracion_presupuesto
+      gastos_generales
     }
   }
 `;
@@ -72,6 +75,7 @@ export const UPDATE_PRESUPUESTO_MUTATION = `
     $ppto_oferta: Float
     $parcial_presupuesto: Float
     $total_presupuesto: Float
+    $gastos_generales: Float
   ) {
     updatePresupuesto(
       id_presupuesto: $id_presupuesto
@@ -88,6 +92,7 @@ export const UPDATE_PRESUPUESTO_MUTATION = `
       ppto_oferta: $ppto_oferta
       parcial_presupuesto: $parcial_presupuesto
       total_presupuesto: $total_presupuesto
+      gastos_generales: $gastos_generales
     ) {
       _id
       id_presupuesto
@@ -106,6 +111,7 @@ export const UPDATE_PRESUPUESTO_MUTATION = `
       fecha_creacion
       observaciones
       numeracion_presupuesto
+      gastos_generales
     }
   }
 `;
@@ -126,6 +132,7 @@ export const CREAR_PRESUPUESTO_PADRE_MUTATION = `
     $nombre_presupuesto: String!
     $porcentaje_igv: Float
     $porcentaje_utilidad: Float
+    $gastos_generales: Float
     $fase: FasePresupuesto
     $id_presupuesto_plantilla: String
     $mantenerAPUs: Boolean
@@ -135,6 +142,7 @@ export const CREAR_PRESUPUESTO_PADRE_MUTATION = `
       nombre_presupuesto: $nombre_presupuesto
       porcentaje_igv: $porcentaje_igv
       porcentaje_utilidad: $porcentaje_utilidad
+      gastos_generales: $gastos_generales
       fase: $fase
       id_presupuesto_plantilla: $id_presupuesto_plantilla
       mantenerAPUs: $mantenerAPUs
@@ -145,6 +153,7 @@ export const CREAR_PRESUPUESTO_PADRE_MUTATION = `
       nombre_presupuesto
       porcentaje_igv
       porcentaje_utilidad
+      gastos_generales
       id_grupo_version
       fase
       version
@@ -256,18 +265,21 @@ export const ACTUALIZAR_PRESUPUESTO_PADRE_MUTATION = `
     $nombre_presupuesto: String
     $porcentaje_igv: Float
     $porcentaje_utilidad: Float
+    $gastos_generales: Float
   ) {
     actualizarPresupuestoPadre(
       id_presupuesto: $id_presupuesto
       nombre_presupuesto: $nombre_presupuesto
       porcentaje_igv: $porcentaje_igv
       porcentaje_utilidad: $porcentaje_utilidad
+      gastos_generales: $gastos_generales
     ) {
       _id
       id_presupuesto
       nombre_presupuesto
       porcentaje_igv
       porcentaje_utilidad
+      gastos_generales
     }
   }
 `;

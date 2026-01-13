@@ -58,6 +58,7 @@ export default function PresupuestoForm({
     porcentaje_igv: '18',
     porcentaje_utilidad: '0',
     total_presupuesto: '0',
+    gastos_generales: '0',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -100,6 +101,7 @@ export default function PresupuestoForm({
         porcentaje_igv: presupuesto.porcentaje_igv?.toString() || '18',
         porcentaje_utilidad: presupuesto.porcentaje_utilidad?.toString() || '0',
         total_presupuesto: presupuesto.total_presupuesto?.toString() || '0',
+        gastos_generales: presupuesto.gastos_generales?.toString() || '0',
       });
     }
   }, [editMode, presupuesto, cantidadPresupuestos]);
@@ -133,13 +135,14 @@ export default function PresupuestoForm({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    const isNumericField = name.includes('costo') || 
-                          name.includes('ppto') || 
-                          name.includes('plazo') || 
+    const isNumericField = name.includes('costo') ||
+                          name.includes('ppto') ||
+                          name.includes('plazo') ||
                           name.includes('porcentaje') ||
                           name.includes('monto') ||
                           name.includes('parcial') ||
-                          name.includes('total');
+                          name.includes('total') ||
+                          name.includes('gastos_generales');
 
     if (isNumericField) {
       // Permitir solo números y un punto decimal
@@ -165,12 +168,13 @@ export default function PresupuestoForm({
           return;
         }
 
-        // Modo crear padre: envía nombre, IGV, utilidad y parámetros de plantilla solo si el switch está activado Y hay plantilla seleccionada
+        // Modo crear padre: envía nombre, IGV, utilidad, gastos generales y parámetros de plantilla solo si el switch está activado Y hay plantilla seleccionada
         if (onSubmit) {
           await onSubmit({
             nombre_presupuesto: formData.nombre_presupuesto,
             porcentaje_igv: parseFloat(formData.porcentaje_igv) || 18,
             porcentaje_utilidad: parseFloat(formData.porcentaje_utilidad) || 0,
+            gastos_generales: parseFloat(formData.gastos_generales) || 0,
             // Solo enviar parámetros de plantilla si el switch está activado Y hay plantilla seleccionada
             ...(usarPlantilla && plantillaSeleccionada && {
               id_presupuesto_plantilla: plantillaSeleccionada.id_presupuesto,
@@ -193,6 +197,7 @@ export default function PresupuestoForm({
           porcentaje_igv: parseFloat(formData.porcentaje_igv) || 18,
           porcentaje_utilidad: parseFloat(formData.porcentaje_utilidad) || 0,
           total_presupuesto: parseFloat(formData.total_presupuesto) || 0,
+          gastos_generales: parseFloat(formData.gastos_generales) || 0,
           observaciones: formData.observaciones,
         };
 
@@ -229,8 +234,8 @@ export default function PresupuestoForm({
           <>
             
 
-            {/* IGV y Utilidad para el padre */}
-            <div className="grid grid-cols-2 gap-4 mt-4">
+            {/* IGV, Utilidad y Gastos Generales para el padre */}
+            <div className="grid grid-cols-3 gap-4 mt-4">
               <div>
                 <label htmlFor="porcentaje_igv" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
                   IGV (%)
@@ -263,6 +268,22 @@ export default function PresupuestoForm({
                   onChange={handleChange}
                   disabled={isSubmittingForm}
                   placeholder="0"
+                />
+              </div>
+              <div>
+                <label htmlFor="gastos_generales" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+                  Gastos Generales (S/.)
+                </label>
+                <Input
+                  id="gastos_generales"
+                  name="gastos_generales"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.gastos_generales}
+                  onChange={handleChange}
+                  disabled={isSubmittingForm}
+                  placeholder="0.00"
                 />
               </div>
             </div>
@@ -611,6 +632,28 @@ export default function PresupuestoForm({
             required
             disabled={isSubmittingForm}
             placeholder="0"
+          />
+        </div>
+      </div>
+
+      {/* Tercera fila: Gastos Generales */}
+      <div className="grid grid-cols-3 gap-4">
+        <div></div>
+        <div></div>
+        <div>
+          <label htmlFor="gastos_generales" className="block text-xs font-medium text-[var(--text-primary)] mb-1">
+            Gastos Generales (S/.)
+          </label>
+          <Input
+            id="gastos_generales"
+            name="gastos_generales"
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.gastos_generales}
+            onChange={handleChange}
+            disabled={isSubmittingForm}
+            placeholder="0.00"
           />
         </div>
       </div>

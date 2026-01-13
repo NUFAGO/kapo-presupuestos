@@ -481,8 +481,9 @@ export default function PresupuestoCard({ presupuestos, grupo, id_proyecto }: Pr
                 await updatePresupuestoPadre.mutateAsync({
                   id_presupuesto: padre.id_presupuesto,
                   nombre_presupuesto: data.nombre_presupuesto,
-                  porcentaje_igv: data.porcentaje_igv ? parseFloat(data.porcentaje_igv) : undefined,
-                  porcentaje_utilidad: data.porcentaje_utilidad ? parseFloat(data.porcentaje_utilidad) : undefined
+                  porcentaje_igv: data.porcentaje_igv !== undefined ? parseFloat(data.porcentaje_igv) : undefined,
+                  porcentaje_utilidad: data.porcentaje_utilidad !== undefined ? parseFloat(data.porcentaje_utilidad) : undefined,
+                  gastos_generales: data.gastos_generales !== undefined ? parseFloat(data.gastos_generales) : undefined
                 });
                 setIsEditPadreModalOpen(false);
               } catch (error) {
