@@ -4230,12 +4230,9 @@ export default function EstructuraPresupuestoEditor({
                               {!puedeColapsar && <div className="w-3" />}
                               <span
                                 className={`font-medium ${getColorPorNivel(titulo.id_titulo, titulo.tipo)}`}
-                                style={{ paddingLeft: `${(calcularNivelDinamico(titulo.id_titulo) - 1) * 12}px` }}
+                                style={{ paddingLeft: `${(calcularNivelDinamico(titulo.id_titulo) - 1) * 13.5}px` }}
                               >
                                 {titulo.descripcion}
-                                {/* <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
-                                  [{titulo.orden}]
-                                </span> */}
                               </span>
                             </div>
                           </td>
@@ -4305,13 +4302,10 @@ export default function EstructuraPresupuestoEditor({
                             <span
                               className="text-[var(--text-primary)]"
                               style={{
-                                paddingLeft: `${(calcularNivelDinamico(partida.id_titulo) + (partida.nivel_partida - 1)) * 12}px`
+                                paddingLeft: `${(calcularNivelDinamico(partida.id_titulo) + 1) * 13.5}px`
                               }}
                             >
                               {partida.descripcion}
-                              {/* <span className="ml-2 text-[8px] text-[var(--text-secondary)] opacity-60 font-normal">
-                                [{partida.orden}]
-                              </span> */}
                             </span>
                           </div>
                         </td>
