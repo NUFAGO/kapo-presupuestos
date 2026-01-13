@@ -766,7 +766,10 @@ export function useUpdatePresupuestoPadre() {
       // Esto asegura que la vista de estructura se actualice automáticamente
       // cuando se cambian los porcentajes (tanto para el padre como para todos los hijos)
       queryClient.invalidateQueries({ queryKey: ['estructura-presupuesto'] });
-      
+
+      // Invalidar la query del proyecto para actualizar el total_proyecto
+      queryClient.invalidateQueries({ queryKey: ['proyecto', presupuesto.id_proyecto] });
+
       toast.success('Presupuesto actualizado exitosamente');
     },
     onError: (error: any) => {

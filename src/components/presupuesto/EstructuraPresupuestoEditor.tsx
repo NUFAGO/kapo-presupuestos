@@ -3746,15 +3746,13 @@ export default function EstructuraPresupuestoEditor({
               total_presupuesto: totalPresupuesto
             }
           );
-          const tiempoGuardarTotalesTotal = performance.now() - tiempoGuardarTotalesInicio;
+
         } catch (error) {
           console.error('[FRONTEND] ❌ Error al guardar totales del presupuesto:', error);
           // No mostrar error al usuario, es una operación secundaria
         }
       }
 
-      const tiempoTotal = performance.now() - tiempoInicio;
-      console.log(`[FRONTEND] ✅ Guardado completo: ${tiempoTotal.toFixed(2)}ms`);
 
       // Limpiar estados de eliminados y elementos nuevos ya guardados
       setTitulosEliminados(new Set());

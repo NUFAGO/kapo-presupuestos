@@ -276,6 +276,7 @@ export const ACTUALIZAR_PRESUPUESTO_PADRE_MUTATION = `
     ) {
       _id
       id_presupuesto
+      id_proyecto
       nombre_presupuesto
       porcentaje_igv
       porcentaje_utilidad
