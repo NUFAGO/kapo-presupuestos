@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, RefreshCw, DollarSign, Target, BarChart3, X, Calendar, Filter, FileText, Layers, Building2, TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon, BarChart2, FileCheck, ArrowRight, RotateCcw, CheckCircle } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { TrendingUp, TrendingDown, RefreshCw, DollarSign, Target, BarChart3, X, Calendar, Filter, FileText, Layers, Building2, TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon, BarChart2, FileCheck, ArrowRight, RotateCcw, CheckCircle, Gavel, Edit3 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { SelectSearch } from '@/components/ui/select-search';
 import { usePresupuestosPorFase, useEstadisticasDashboard } from '@/hooks/usePresupuestos';
@@ -87,7 +87,7 @@ interface HistoricoMensualItem {
 // Datos vacíos para mostrar estructura cuando no hay datos reales
 const datosVacios: ResumenPresupuestoData = {
   id_presupuesto: null,
-  fecha_calculo: new Date().toISOString(),
+  fecha_calculo: '2024-01-01T00:00:00.000Z', // Fecha fija para evitar re-renders
   es_historico: false,
   es_snapshot: false,
   total_presupuesto: 0,
@@ -222,23 +222,26 @@ export default function DashboardPage() {
   }, [presupuestosMetaVigentes]);
 
   // Obtener datos reales del backend
-  const filtrosResumen: FiltrosResumen = {
+  const filtrosResumen: FiltrosResumen = useMemo(() => ({
     id_presupuesto: filtroPresupuesto || null,
     id_proyecto: filtroProyecto || null
-  };
+  }), [filtroPresupuesto, filtroProyecto]);
 
-  const { 
-    resumen: datosReales, 
+  // Solo ejecutar consultas de resumen cuando hay filtros aplicados
+  const hasAppliedFilters = !!(filtroProyecto || filtroPresupuesto);
+
+  const {
+    resumen: datosReales,
     isLoading: isLoadingResumen,
     sincronizar,
     isSincronizando,
     refetch: refetchResumen
-  } = useResumenPresupuesto(filtrosResumen);
+  } = useResumenPresupuesto(filtrosResumen, hasAppliedFilters);
 
-  const { 
+  const {
     historico: historicoReal,
     isLoading: isLoadingHistorico
-  } = useHistoricoMensual(filtrosResumen, 12);
+  } = useHistoricoMensual(filtrosResumen, 12, hasAppliedFilters);
 
   // Usar datos reales si están disponibles, sino usar datos vacíos (valores en 0)
   const datos = datosReales || datosVacios;
@@ -269,19 +272,19 @@ export default function DashboardPage() {
     }));
   }, [historicoReal]);
   
-  const handleRecalcular = () => {
-    sincronizar(true); // Forzar recálculo
-  };
+  const handleRecalcular = useCallback(() => {
+    sincronizar(); // Sincronizar TODOS los resúmenes
+  }, [sincronizar]);
 
   // Función para aplicar filtros desde UI a los filtros reales
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     setFiltroProyecto(filtroProyectoUI);
     setFiltroPresupuesto(filtroPresupuestoUI);
     setFechaDesde(fechaDesdeUI);
     setFechaHasta(fechaHastaUI);
-  };
+  }, [filtroProyectoUI, filtroPresupuestoUI, fechaDesdeUI, fechaHastaUI]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFiltroProyectoUI('');
     setFiltroPresupuestoUI('');
     setFechaDesdeUI('');
@@ -291,9 +294,12 @@ export default function DashboardPage() {
     setFiltroPresupuesto('');
     setFechaDesde('');
     setFechaHasta('');
-  };
+  }, []);
 
-  const hasActiveFilters = filtroProyectoUI || filtroPresupuestoUI || fechaDesdeUI || fechaHastaUI;
+  const hasActiveFilters = useMemo(() =>
+    !!(filtroProyectoUI || filtroPresupuestoUI || fechaDesdeUI || fechaHastaUI),
+    [filtroProyectoUI, filtroPresupuestoUI, fechaDesdeUI, fechaHastaUI]
+  );
 
 
   // Calcular puntos para el gráfico (normalizados a 0-100)
@@ -309,16 +315,18 @@ export default function DashboardPage() {
     return max > 0 ? max : 1; // Evitar división por cero
   }, [historicoMensual]);
   
-  const calcularY = (valor: number | undefined | null) => {
+  const calcularY = useCallback((valor: number | undefined | null) => {
     const val = valor ?? 0;
     if (!isFinite(val) || !isFinite(maxValor) || maxValor === 0) return 0;
     return 100 - (val / maxValor) * 100;
-  };
+  }, [maxValor]);
 
   // Calcular proyección (basado en tendencia)
-  const costoProyectado = historicoMensual && historicoMensual.length > 0
-    ? (historicoMensual[historicoMensual.length - 1].total_requerimiento ?? 0) * 1.15 // Proyección conservadora
-    : datos.total_requerimiento * 1.15;
+  const costoProyectado = useMemo(() => {
+    return historicoMensual && historicoMensual.length > 0
+      ? (historicoMensual[historicoMensual.length - 1].total_requerimiento ?? 0) * 1.15 // Proyección conservadora
+      : (datos?.total_requerimiento ?? 0) * 1.15;
+  }, [historicoMensual, datos?.total_requerimiento]);
 
   return (
     <div className="space-y-3">
@@ -564,50 +572,50 @@ export default function DashboardPage() {
                   <BarChart2 className="h-3.5 w-3.5" />
                   Resumen de Presupuestos
                 </h3>
-                <div className="grid grid-cols-2 gap-2">
-                <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-2 card-shadow">
-                  <div className="flex items-center gap-1.5 mb-1">
-                      <FileText className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                      <span className="text-[11px] text-[var(--text-secondary)]">META</span>
-                      {isLoadingEstadisticas && <div className="w-1 h-1 bg-green-600 rounded-full animate-pulse"></div>}
-                    </div>
-                    <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                      {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.META}
-                  </div>
-                </div>
-                
-                  <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-2 card-shadow">
-                  <div className="flex items-center gap-1.5 mb-1">
-                      <Layers className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
-                      <span className="text-[11px] text-[var(--text-secondary)]">Licitación</span>
-                      {isLoadingEstadisticas && <div className="w-1 h-1 bg-orange-600 rounded-full animate-pulse"></div>}
-                  </div>
-                    <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                      {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.LICITACION}
-                </div>
-              </div>
-              
-                  <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-2 card-shadow">
+                <div className="grid grid-cols-2 gap-3">
+                  {/* META */}
+                  <div className="bg-green-100 dark:bg-green-900/10 rounded-lg p-2 card-shadow">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <FileCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                      <span className="text-[11px] text-[var(--text-secondary)]">Contractual</span>
-                      {isLoadingEstadisticas && <div className="w-1 h-1 bg-blue-600 rounded-full animate-pulse"></div>}
+                      <Target className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                      <span className="text-[11px] text-[var(--text-secondary)]">META</span>
                     </div>
-                    <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                    <div className="text-base font-bold text-green-600 dark:text-green-400">
+                      {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.META}
+                    </div>
+                  </div>
+
+                  {/* Licitación */}
+                  <div className="bg-orange-100 dark:bg-orange-900/10 rounded-lg p-2 card-shadow">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Gavel className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                      <span className="text-[11px] text-[var(--text-secondary)]">Licitación</span>
+                    </div>
+                    <div className="text-base font-bold text-orange-600 dark:text-orange-400">
+                      {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.LICITACION}
+                    </div>
+                  </div>
+
+                  {/* Contractual */}
+                  <div className="bg-blue-100 dark:bg-blue-900/10 rounded-lg p-2 card-shadow">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <FileCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span className="text-[11px] text-[var(--text-secondary)]">Contractual</span>
+                    </div>
+                    <div className="text-base font-bold text-blue-600 dark:text-blue-400">
                       {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.CONTRACTUAL}
                     </div>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-gray-950/20 rounded-lg p-2 card-shadow">
+                  {/* Borrador */}
+                  <div className="bg-gray-100 dark:bg-gray-900/10 rounded-lg p-2 card-shadow">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Target className="h-3.5 w-3.5 text-gray-600" />
+                      <Edit3 className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
                       <span className="text-[11px] text-[var(--text-secondary)]">Borrador</span>
-                      {isLoadingEstadisticas && <div className="w-1 h-1 bg-gray-600 rounded-full animate-pulse"></div>}
                     </div>
-                    <div className="text-xl font-bold text-gray-600">
+                    <div className="text-base font-bold text-gray-600 dark:text-gray-400">
                       {isLoadingEstadisticas ? '...' : estadisticas.presupuestosPorFase.BORRADOR}
                     </div>
-                </div>
+                  </div>
                 </div>
               </div>
               
@@ -675,77 +683,76 @@ export default function DashboardPage() {
                     <span>{((maxValor * 0.25) / 1000).toFixed(0)}k</span>
                     <span className="pb-1">0</span>
                   </div>
-                  
+
                   {/* Gráfico */}
                   <div className="ml-14 h-full relative">
-                    {/* Líneas de referencia horizontales */}
-                    <div className="absolute inset-0 flex flex-col justify-between">
-                      {[0, 1, 2, 3, 4].map(i => (
-                        <div key={i} className="border-t border-[var(--border-color)] opacity-20" />
-                      ))}
-                    </div>
-                    
+
                     {/* Líneas del gráfico usando SVG */}
                     {(() => {
                       const historico = historicoMensual;
                       const divisor = historico.length > 1 ? historico.length - 1 : 1; // Evitar división por cero
-                      
+
                       return (
                         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                          {/* Línea Presupuesto Meta (gris) */}
-                          <polyline
-                            points={historico.map((item: HistoricoMensualItem, idx: number) => 
-                              `${(idx / divisor) * 100},${calcularY(item.total_presupuesto)}`
-                            ).join(' ')}
-                            fill="none"
-                            stroke="#6b7280"
-                            strokeWidth="0.8"
-                            vectorEffect="non-scaling-stroke"
-                          />
-                          
-                          {/* Línea Composición (verde) */}
-                          <polyline
-                            points={historico.map((item: HistoricoMensualItem, idx: number) => 
-                              `${(idx / divisor) * 100},${calcularY(item.total_composicion)}`
-                            ).join(' ')}
-                            fill="none"
-                            stroke="#22c55e"
-                            strokeWidth="1"
-                            vectorEffect="non-scaling-stroke"
-                          />
-                          
-                          {/* Línea Requerimiento/Proyectado (naranja punteada) */}
-                          <polyline
-                            points={historico.map((item: HistoricoMensualItem, idx: number) => 
-                              `${(idx / divisor) * 100},${calcularY(item.total_requerimiento)}`
-                            ).join(' ')}
-                            fill="none"
-                            stroke="#f97316"
-                            strokeWidth="1"
-                            strokeDasharray="3,2"
-                            vectorEffect="non-scaling-stroke"
-                          />
-                          
-                          {/* Línea Recepción Real (azul sólida) - solo hasta donde hay datos */}
-                          {historico.filter((h: HistoricoMensualItem) => (h.total_recepcion_almacen ?? 0) > 0).length > 0 && (
-                            <polyline
-                              points={historico
-                                .filter((item: HistoricoMensualItem, idx: number) => (item.total_recepcion_almacen ?? 0) > 0 || idx === 0)
-                                .map((item: HistoricoMensualItem, idx: number) => {
-                                  const originalIdx = historico.indexOf(item);
-                                  return `${(originalIdx / divisor) * 100},${calcularY(item.total_recepcion_almacen)}`;
-                                })
-                                .join(' ')}
-                              fill="none"
-                              stroke="#3b82f6"
-                              strokeWidth="1.2"
-                              vectorEffect="non-scaling-stroke"
-                            />
+                          {/* Solo mostrar líneas si hay datos históricos reales */}
+                          {historicoReal && historicoReal.length > 0 && (
+                            <>
+                              {/* Línea Presupuesto Meta (gris) */}
+                              <polyline
+                                points={historico.map((item: HistoricoMensualItem, idx: number) =>
+                                  `${(idx / divisor) * 100},${calcularY(item.total_presupuesto)}`
+                                ).join(' ')}
+                                fill="none"
+                                stroke="#6b7280"
+                                strokeWidth="0.8"
+                                vectorEffect="non-scaling-stroke"
+                              />
+
+                              {/* Línea Composición (verde) */}
+                              <polyline
+                                points={historico.map((item: HistoricoMensualItem, idx: number) =>
+                                  `${(idx / divisor) * 100},${calcularY(item.total_composicion)}`
+                                ).join(' ')}
+                                fill="none"
+                                stroke="#22c55e"
+                                strokeWidth="1"
+                                vectorEffect="non-scaling-stroke"
+                              />
+
+                              {/* Línea Requerimiento/Proyectado (naranja punteada) */}
+                              <polyline
+                                points={historico.map((item: HistoricoMensualItem, idx: number) =>
+                                  `${(idx / divisor) * 100},${calcularY(item.total_requerimiento)}`
+                                ).join(' ')}
+                                fill="none"
+                                stroke="#f97316"
+                                strokeWidth="1"
+                                strokeDasharray="3,2"
+                                vectorEffect="non-scaling-stroke"
+                              />
+
+                              {/* Línea Recepción Real (azul sólida) - solo hasta donde hay datos */}
+                              {historico.filter((h: HistoricoMensualItem) => (h.total_recepcion_almacen ?? 0) > 0).length > 0 && (
+                                <polyline
+                                  points={historico
+                                    .filter((item: HistoricoMensualItem, idx: number) => (item.total_recepcion_almacen ?? 0) > 0 || idx === 0)
+                                    .map((item: HistoricoMensualItem, idx: number) => {
+                                      const originalIdx = historico.indexOf(item);
+                                      return `${(originalIdx / divisor) * 100},${calcularY(item.total_recepcion_almacen)}`;
+                                    })
+                                    .join(' ')}
+                                  fill="none"
+                                  stroke="#3b82f6"
+                                  strokeWidth="1.2"
+                                  vectorEffect="non-scaling-stroke"
+                                />
+                              )}
+                            </>
                           )}
                         </svg>
                       );
                     })()}
-                    
+
                     {/* Eje X - Meses */}
                     <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[11px] text-[var(--text-secondary)] px-1 pb-1">
                       {historicoMensual.map((item: HistoricoMensualItem, idx: number) => (
@@ -756,7 +763,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Leyenda */}
                 <div className="flex items-center justify-center gap-3 mt-2 text-[11px] flex-wrap">
                   <div className="flex items-center gap-2">
@@ -777,7 +784,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-            
+
             {/* Resumen de valores */}
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-[var(--card-bg)] rounded-lg p-2 card-shadow">
@@ -799,7 +806,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            
+
             {/* Detalle de costos */}
             <div className="mt-3 pt-3 border-t border-[var(--border-color)] space-y-1.5 text-[11px]">
               <div className="flex justify-between">

@@ -65,7 +65,7 @@ export type ResumenPresupuestoHistorico = Pick<ResumenPresupuesto,
 /**
  * Hook para obtener resumen de presupuestos
  */
-export function useResumenPresupuesto(filtros: FiltrosResumen) {
+export function useResumenPresupuesto(filtros: FiltrosResumen, enabled: boolean = true) {
   const queryClient = useQueryClient();
 
   const {
@@ -82,22 +82,28 @@ export function useResumenPresupuesto(filtros: FiltrosResumen) {
       );
       return result.obtenerResumenPresupuesto;
     },
+    enabled, // Controlar cuándo se ejecuta la consulta
     staleTime: 5 * 60 * 1000, // 5 minutos
     refetchOnWindowFocus: false
   });
 
   const sincronizarMutation = useMutation({
     mutationFn: async (forzar: boolean = false) => {
-      const result = await executeMutation<{ sincronizarResumen: ResumenPresupuesto }>(
-        SINCRONIZAR_RESUMEN_MUTATION,
-        { filtros, forzar }
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/195c1f53-6fa3-4d58-9fd9-75a9f3803530',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useResumenPresupuesto.ts:95',message:'sincronizarMutation ejecutada',data:{forzar},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});      
+      // #endregion
+      // CAMBIADO: Ahora sincroniza TODOS los resúmenes en lugar de uno solo
+      const result = await executeMutation<{ sincronizarTodosLosResumenes: string }>(
+        'mutation SincronizarTodosLosResumenes { sincronizarTodosLosResumenes }',
+        {}
       );
-      return result.sincronizarResumen;
+      return result.sincronizarTodosLosResumenes;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['resumenPresupuesto', filtros] });
-      queryClient.invalidateQueries({ queryKey: ['historicoMensual', filtros] });
-      toast.success('Resumen sincronizado exitosamente');
+      // Invalidar TODOS los resúmenes y históricos
+      queryClient.invalidateQueries({ queryKey: ['resumenPresupuesto'] });
+      queryClient.invalidateQueries({ queryKey: ['historicoMensual'] });
+      toast.success('Todos los resúmenes sincronizados exitosamente');
     },
     onError: (error: Error) => {
       toast.error(`Error al sincronizar: ${error.message}`);
@@ -109,7 +115,7 @@ export function useResumenPresupuesto(filtros: FiltrosResumen) {
     isLoading,
     error,
     refetch,
-    sincronizar: (forzar: boolean = false) => sincronizarMutation.mutate(forzar),
+    sincronizar: () => sincronizarMutation.mutate(false), // Ahora sincroniza TODOS los resúmenes
     isSincronizando: sincronizarMutation.isPending
   };
 }
@@ -117,7 +123,7 @@ export function useResumenPresupuesto(filtros: FiltrosResumen) {
 /**
  * Hook para obtener histórico mensual
  */
-export function useHistoricoMensual(filtros: FiltrosResumen, meses: number = 12) {
+export function useHistoricoMensual(filtros: FiltrosResumen, meses: number = 12, enabled: boolean = true) {
   const {
     data: historico,
     isLoading,
@@ -131,6 +137,7 @@ export function useHistoricoMensual(filtros: FiltrosResumen, meses: number = 12)
       );
       return result.obtenerHistoricoMensual;
     },
+    enabled, // Controlar cuándo se ejecuta la consulta
     staleTime: 10 * 60 * 1000, // 10 minutos
     refetchOnWindowFocus: false
   });

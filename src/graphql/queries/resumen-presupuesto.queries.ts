@@ -95,6 +95,15 @@ export const GET_RESUMENES_INDIVIDUALES_QUERY = `
 export const SINCRONIZAR_RESUMEN_MUTATION = `
   mutation SincronizarResumen($filtros: FiltrosResumenInput!, $forzar: Boolean) {
     sincronizarResumen(filtros: $filtros, forzar: $forzar) {
+      ...ResumenPresupuestoFragment
+    }
+
+    # Nueva mutación para sincronizar TODOS los resúmenes
+    mutation SincronizarTodosLosResumenes {
+      sincronizarTodosLosResumenes
+    }
+
+    sincronizarResumen(filtros: $filtros, forzar: $forzar) {
       id_resumen
       fecha_calculo
       total_presupuesto
