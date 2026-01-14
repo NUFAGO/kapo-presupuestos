@@ -9,6 +9,7 @@ import { LoadingSpinner } from '@/components/ui';
 import Modal from '@/components/ui/modal';
 import { useProyecto } from '@/hooks/useProyectos';
 import { usePresupuestosByProyecto, useCreatePresupuestoPadre, useBuscarPresupuestosPlantillas } from '@/hooks/usePresupuestos';
+import { useScrollRestoration } from '@/hooks';
 import PresupuestoCard from './components/PresupuestoCard';
 import ProyectoDetalles from './components/ProyectoDetalles';
 import PresupuestoForm from './components/PresupuestoForm';
@@ -45,6 +46,9 @@ export default function ProyectoDetallePage({ params }: PageProps) {
   
   // Consultar presupuestos del proyecto
   const { data: presupuestos = [], isLoading: isLoadingPresupuestos, error: errorPresupuestos } = usePresupuestosByProyecto(id_proyecto);
+
+  // Scroll restoration automático (key única por proyecto)
+  useScrollRestoration(`proyecto-${id_proyecto}`);
 
 
   // Función para resetear el estado del modal

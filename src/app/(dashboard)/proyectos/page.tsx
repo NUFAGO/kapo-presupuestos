@@ -11,7 +11,7 @@ import { LoadingSpinner } from '@/components/ui';
 import ProyectoCard from './components/ProyectoCard';
 import Pagination from './components/Pagination';
 import ProyectoForm from './components/ProyectoForm';
-import { useProyectos, useCreateProyecto, useUpdateProyecto, useDeleteProyecto } from '@/hooks';
+import { useProyectos, useCreateProyecto, useUpdateProyecto, useDeleteProyecto, useScrollRestoration } from '@/hooks';
 import { usePageState } from '@/hooks/usePageState';
 import { PaginationFilterInput } from '@/services/proyecto-service';
 import type { Proyecto } from '@/services/proyecto-service';
@@ -32,6 +32,9 @@ function ProyectosContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProyecto, setSelectedProyecto] = useState<Proyecto | null>(null);
+
+  // Scroll restoration automático
+  useScrollRestoration('proyectos');
 
   // Preparar input para la query
   const queryInput: PaginationFilterInput = useMemo(() => {

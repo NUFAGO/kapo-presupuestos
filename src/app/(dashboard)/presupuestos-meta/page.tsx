@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, Suspense } from 'react';
+import { useMemo, Suspense, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X, Building2, FileText, Layers, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/ui';
 import { useProyectosConPresupuestosPorFase } from '@/hooks/usePresupuestos';
 import { useProyectos } from '@/hooks';
 import { usePageState } from '@/hooks/usePageState';
+import { useScrollRestoration } from '@/hooks';
 import { executeQuery } from '@/services/graphql-client';
 import { LIST_PROYECTOS_PAGINATED_QUERY } from '@/graphql/queries/proyecto.queries';
 import { SelectSearchOption } from '@/components/ui/select-search';
@@ -43,6 +44,9 @@ function PresupuestosMetaContent() {
     setCurrentPage,
     clearFilters,
   } = usePageState('meta');
+
+  // SCROLL RESTORATION - Hook reutilizable
+  useScrollRestoration('presupuestos-meta');
 
   // Obtener proyectos para el filtro (ahora optimizado con paginación escalable)
   const { data: proyectosData } = useProyectos({

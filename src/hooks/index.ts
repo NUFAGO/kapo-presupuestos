@@ -82,4 +82,7 @@ export {
   type ResumenPresupuesto,
   type ResumenPresupuestoHistorico,
 } from './useResumenPresupuesto';
+export {
+  useScrollRestoration,
+} from './useScrollRestoration';
 

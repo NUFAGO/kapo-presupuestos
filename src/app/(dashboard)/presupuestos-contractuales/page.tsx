@@ -10,6 +10,7 @@ import { LoadingSpinner } from '@/components/ui';
 import { useProyectosConPresupuestosPorFase } from '@/hooks/usePresupuestos';
 import { useProyectos } from '@/hooks';
 import { usePageState } from '@/hooks/usePageState';
+import { useScrollRestoration } from '@/hooks';
 import { executeQuery } from '@/services/graphql-client';
 import { LIST_PROYECTOS_PAGINATED_QUERY } from '@/graphql/queries/proyecto.queries';
 import { SelectSearchOption } from '@/components/ui/select-search';
@@ -35,6 +36,10 @@ const ITEMS_PER_PAGE = 20;
 
 function PresupuestosContractualesContent() {
   const router = useRouter();
+
+  // Scroll restoration automático
+  useScrollRestoration('presupuestos-contractuales');
+
   const {
     searchQuery,
     filtroProyecto,

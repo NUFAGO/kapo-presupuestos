@@ -8,12 +8,16 @@ import ProyectoConPresupuestosCard from './components/ProyectoConPresupuestosCar
 import Pagination from '../../proyectos/components/Pagination';
 import { useProyectosConMetaVigenteConSearch } from '@/hooks/usePresupuestos';
 import { usePageState } from '@/hooks/usePageState';
+import { useScrollRestoration } from '@/hooks';
 import { PaginationInput } from '@/services/proyecto-service';
 import type { Proyecto } from '@/services/proyecto-service';
 
 const ITEMS_PER_PAGE = 20;
 
 function ControlCostosContent() {
+  // Scroll restoration automático
+  useScrollRestoration('costos-control-costos');
+
   const {
     searchQuery,
     currentPage,
